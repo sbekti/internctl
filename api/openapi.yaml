@@ -1,0 +1,1068 @@
+openapi: 3.0.3
+info:
+  title: intern-api
+  version: 0.1.0
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  description: |
+    V1 API contract for an internal site such as `intern.corp.example.com`.
+
+    Authentication modes:
+
+    - browser traffic arrives behind trusted forward-auth and is normalized by the API
+    - public clients authenticate with bearer JWT access tokens minted by the device code flow
+
+    Authorization is enforced server-side. Admin-only operations require membership in the configured admin group set, which defaults to `Super-Users`.
+servers:
+  - url: https://intern.corp.invalid
+    description: Production
+  - url: http://intern.corp.test
+    description: Local development through the dev auth proxy
+tags:
+  - name: Profile
+    description: Current-user identity, preferences, and session management.
+  - name: Dashboard
+    description: Dashboard summary data for the authenticated user.
+  - name: Networks
+    description: VLAN and network device management operations.
+  - name: Auth
+    description: Device code login and token lifecycle endpoints for public clients.
+  - name: Admin
+    description: Administrator-only auth session inspection and revocation.
+paths:
+  /api/v1/profile:
+    get:
+      operationId: getProfile
+      tags: [Profile]
+      summary: Get the current authenticated user's profile.
+      description: |
+        Returns the current user's identity and group membership after the API resolves the caller from either trusted forward-auth headers or a bearer JWT.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user profile.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/profile/preferences:
+    patch:
+      operationId: patchProfilePreferences
+      tags: [Profile]
+      summary: Update current user preferences.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfilePreferencesPatch'
+      responses:
+        '200':
+          description: Updated preferences.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfilePreferences'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/profile/sessions:
+    get:
+      operationId: listProfileSessions
+      tags: [Profile]
+      summary: List active auth sessions for the current user.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Active sessions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSessionList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/profile/sessions/{id}/revoke:
+    post:
+      operationId: revokeProfileSession
+      tags: [Profile]
+      summary: Revoke one active session belonging to the current user.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '204':
+          description: Session revoked or already absent.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/profile/sessions/revoke_others:
+    post:
+      operationId: revokeOtherProfileSessions
+      tags: [Profile]
+      summary: Revoke all other active sessions for the current user.
+      description: For bearer-authenticated callers, the current bearer session is kept and other active API sessions are revoked. For forward-auth browser callers, all active API sessions for the user are revoked.
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Other sessions revoked.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/admin/auth/sessions:
+    get:
+      operationId: listAdminAuthSessions
+      tags: [Admin]
+      summary: List active auth sessions across users.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Active sessions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSessionList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/admin/auth/sessions/{id}/revoke:
+    post:
+      operationId: revokeAdminAuthSession
+      tags: [Admin]
+      summary: Revoke a session as an administrator.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '204':
+          description: Session revoked or already absent.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/admin/audit_logs:
+    get:
+      operationId: listAdminAuditLogs
+      tags: [Admin]
+      summary: List audit logs across the platform.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: action
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: resource_type
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: resource_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: actor_username
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 200
+            default: 50
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Audit log page.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/dashboard:
+    get:
+      operationId: getDashboard
+      tags: [Dashboard]
+      summary: Get dashboard summary data.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Dashboard payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/networks/vlans:
+    get:
+      operationId: listVlans
+      tags: [Networks]
+      summary: List VLAN definitions.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: VLAN list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VlanList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createVlan
+      tags: [Networks]
+      summary: Create a VLAN definition.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VlanWrite'
+      responses:
+        '201':
+          description: VLAN created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vlan'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/networks/vlans/{id}:
+    get:
+      operationId: getVlan
+      tags: [Networks]
+      summary: Get one VLAN definition.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/VlanId'
+      responses:
+        '200':
+          description: VLAN record.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vlan'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: patchVlan
+      tags: [Networks]
+      summary: Update a VLAN definition.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/VlanId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VlanPatch'
+      responses:
+        '200':
+          description: Updated VLAN.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vlan'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      operationId: deleteVlan
+      tags: [Networks]
+      summary: Delete a VLAN definition.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/VlanId'
+      responses:
+        '204':
+          description: VLAN deleted or already absent.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/networks/devices:
+    get:
+      operationId: listNetworkDevices
+      tags: [Networks]
+      summary: List network devices.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Device list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkDeviceList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: createNetworkDevice
+      tags: [Networks]
+      summary: Create a network device.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetworkDeviceWrite'
+      responses:
+        '201':
+          description: Device created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkDevice'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/networks/devices/{id}:
+    get:
+      operationId: getNetworkDevice
+      tags: [Networks]
+      summary: Get one network device.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      responses:
+        '200':
+          description: Device record.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkDevice'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: patchNetworkDevice
+      tags: [Networks]
+      summary: Update a network device.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetworkDevicePatch'
+      responses:
+        '200':
+          description: Updated device.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkDevice'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      operationId: deleteNetworkDevice
+      tags: [Networks]
+      summary: Delete a network device.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      responses:
+        '204':
+          description: Device deleted or already absent.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/auth/device_codes:
+    post:
+      operationId: createDeviceCode
+      tags: [Auth]
+      summary: Create a new device code request for a public client.
+      security: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceCodeCreateRequest'
+      responses:
+        '201':
+          description: Device code request created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceCode'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/auth/device_codes/{user_code}/approve:
+    post:
+      operationId: approveDeviceCode
+      tags: [Auth]
+      summary: Approve a pending device code request for the current authenticated user.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserCode'
+      responses:
+        '204':
+          description: Authorization approved.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/auth/device_codes/{user_code}/deny:
+    post:
+      operationId: denyDeviceCode
+      tags: [Auth]
+      summary: Deny a pending device code request for the current authenticated user.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserCode'
+      responses:
+        '204':
+          description: Authorization denied.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/auth/tokens:
+    post:
+      operationId: exchangeDeviceCode
+      tags: [Auth]
+      summary: Exchange an approved device code for access and refresh tokens.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceCodeTokenRequest'
+      responses:
+        '200':
+          description: Tokens issued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          description: Invalid, denied, or expired device code request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientAuthError'
+        '428':
+          description: Device code request still pending approval.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientAuthError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/auth/tokens/refresh:
+    post:
+      operationId: refreshAccessToken
+      tags: [Auth]
+      summary: Rotate the refresh token and mint a new access token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Tokens rotated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/auth/logout:
+    post:
+      operationId: logoutSession
+      tags: [Auth]
+      summary: Revoke the presented refresh session.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+      responses:
+        '204':
+          description: Session revoked or already absent.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    DeviceId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SessionId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    UserCode:
+      name: user_code
+      in: path
+      required: true
+      schema:
+        type: string
+    VlanId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+  responses:
+    BadRequest:
+      description: Request validation failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Authentication required or credentials invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Caller is authenticated but not authorized.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: Request conflicts with current state.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    TooManyRequests:
+      description: Rate limit exceeded.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+    Profile:
+      type: object
+      required: [username, name, email, groups, is_admin]
+      properties:
+        username:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        groups:
+          type: array
+          items:
+            type: string
+        is_admin:
+          type: boolean
+    ProfilePreferences:
+      type: object
+      properties:
+        timezone:
+          type: string
+        locale:
+          type: string
+    ProfilePreferencesPatch:
+      type: object
+      properties:
+        timezone:
+          type: string
+        locale:
+          type: string
+    AuthSession:
+      type: object
+      required:
+        - id
+        - username
+        - client_name
+        - created_at
+        - expires_at
+        - idle_expires_at
+        - is_current
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        client_name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+        expires_at:
+          type: string
+          format: date-time
+        idle_expires_at:
+          type: string
+          format: date-time
+        is_current:
+          type: boolean
+    AuthSessionList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuthSession'
+    AuditLogEntry:
+      type: object
+      required:
+        - id
+        - actor_username
+        - action
+        - resource_type
+        - resource_id
+        - metadata
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        actor_username:
+          type: string
+        action:
+          type: string
+        resource_type:
+          type: string
+        resource_id:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+    AuditLogPagination:
+      type: object
+      required: [limit, offset, total]
+      properties:
+        limit:
+          type: integer
+          format: int32
+        offset:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+    AuditLogList:
+      type: object
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditLogEntry'
+        pagination:
+          $ref: '#/components/schemas/AuditLogPagination'
+    Dashboard:
+      type: object
+      required: [welcome_message, profile, network_summary]
+      properties:
+        welcome_message:
+          type: string
+        profile:
+          $ref: '#/components/schemas/Profile'
+        network_summary:
+          $ref: '#/components/schemas/NetworkSummary'
+        weather:
+          $ref: '#/components/schemas/WeatherSummary'
+    NetworkSummary:
+      type: object
+      required: [device_count, vlan_count]
+      properties:
+        device_count:
+          type: integer
+          format: int64
+          minimum: 0
+        vlan_count:
+          type: integer
+          format: int64
+          minimum: 0
+    WeatherSummary:
+      type: object
+      required: [location_name, timezone, current]
+      properties:
+        location_name:
+          type: string
+        timezone:
+          type: string
+        current:
+          $ref: '#/components/schemas/WeatherCurrent'
+    WeatherCurrent:
+      type: object
+      required: [temperature_c, wind_speed_kph, weather_code]
+      properties:
+        temperature_c:
+          type: number
+          format: float
+        wind_speed_kph:
+          type: number
+          format: float
+        weather_code:
+          type: integer
+          format: int32
+    Vlan:
+      type: object
+      required:
+        - id
+        - name
+        - vlan_id
+        - description
+        - is_active
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        vlan_id:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 4094
+        description:
+          type: string
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    VlanRef:
+      type: object
+      required: [id, name, vlan_id]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        vlan_id:
+          type: integer
+          format: int32
+    VlanList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Vlan'
+    VlanWrite:
+      type: object
+      required: [name, vlan_id]
+      properties:
+        name:
+          type: string
+        vlan_id:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 4094
+        description:
+          type: string
+          default: ''
+        is_active:
+          type: boolean
+          default: true
+    VlanPatch:
+      type: object
+      properties:
+        name:
+          type: string
+        vlan_id:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 4094
+        description:
+          type: string
+        is_active:
+          type: boolean
+    NetworkDevice:
+      type: object
+      required:
+        - id
+        - mac_address
+        - display_name
+        - vlan
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        mac_address:
+          type: string
+          example: aa:bb:cc:dd:ee:ff
+        display_name:
+          type: string
+        vlan:
+          $ref: '#/components/schemas/VlanRef'
+        created_by_user_id:
+          type: string
+          format: uuid
+          nullable: true
+        updated_by_user_id:
+          type: string
+          format: uuid
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    NetworkDeviceList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/NetworkDevice'
+    NetworkDeviceWrite:
+      type: object
+      required: [mac_address, display_name, vlan_id]
+      properties:
+        mac_address:
+          type: string
+          example: aa:bb:cc:dd:ee:ff
+        display_name:
+          type: string
+        vlan_id:
+          type: integer
+          format: int64
+          minimum: 1
+    NetworkDevicePatch:
+      type: object
+      properties:
+        mac_address:
+          type: string
+          example: aa:bb:cc:dd:ee:ff
+        display_name:
+          type: string
+        vlan_id:
+          type: integer
+          format: int64
+          minimum: 1
+    DeviceCodeCreateRequest:
+      type: object
+      properties:
+        client_name:
+          type: string
+          default: internctl
+    DeviceCode:
+      type: object
+      required:
+        - device_code
+        - user_code
+        - expires_in_seconds
+        - poll_interval_seconds
+      properties:
+        device_code:
+          type: string
+        user_code:
+          type: string
+        expires_in_seconds:
+          type: integer
+          format: int32
+        poll_interval_seconds:
+          type: integer
+          format: int32
+    DeviceCodeTokenRequest:
+      type: object
+      required: [device_code]
+      properties:
+        device_code:
+          type: string
+    RefreshTokenRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+    LogoutRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+    TokenResponse:
+      type: object
+      required: [access_token, token_type, expires_in_seconds, refresh_token]
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          example: Bearer
+        expires_in_seconds:
+          type: integer
+          format: int32
+        refresh_token:
+          type: string
+    ClientAuthError:
+      type: object
+      required: [error, error_description]
+      properties:
+        error:
+          type: string
+          enum:
+            - authorization_pending
+            - invalid_request
+            - access_denied
+            - expired_token
+            - slow_down
+        error_description:
+          type: string
