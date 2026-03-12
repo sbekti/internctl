@@ -63,7 +63,7 @@ func TestLoginPersistsProfileAndSession(t *testing.T) {
 	if !strings.Contains(stdout.String(), "Login successful.") {
 		t.Fatalf("stdout missing success message: %s", stdout.String())
 	}
-	if !strings.Contains(stdout.String(), "Verification URL: "+server.URL+"/auth/device") {
+	if !strings.Contains(stdout.String(), "Verification URL: "+server.URL+"/auth/device?user_code=ABCD-EFGH") {
 		t.Fatalf("stdout missing derived verification URL: %s", stdout.String())
 	}
 	if stderr.Len() != 0 {
@@ -155,5 +155,47 @@ func TestLogoutClearsLocalSessionOnRemoteFailure(t *testing.T) {
 	}
 	if _, _, err := manager.Load(config.DefaultProfile, session.BackendFile); !errors.Is(err, session.ErrSessionNotFound) {
 		t.Fatalf("session still present, err = %v", err)
+	}
+}
+
+func TestLoginRefusesToReplaceExistingSessionWithoutForce(t *testing.T) {
+	t.Parallel()
+
+	configDir := t.TempDir()
+	cfg := config.File{
+		Profiles: map[string]config.Profile{
+			config.DefaultProfile: {
+				ServerURL:    "https://example.com",
+				TokenBackend: "file",
+			},
+		},
+	}
+	if err := config.Save(configDir, cfg); err != nil {
+		t.Fatalf("Save config returned error: %v", err)
+	}
+
+	manager := session.NewManager(configDir)
+	if _, err := manager.Save(config.DefaultProfile, session.BackendFile, session.Data{
+		AccessToken:  "access-token",
+		RefreshToken: "refresh-token",
+		TokenType:    "Bearer",
+		ExpiresAt:    time.Now().Add(time.Minute),
+	}); err != nil {
+		t.Fatalf("Save session returned error: %v", err)
+	}
+
+	cmd := NewRootCommand()
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"login", "--config-dir", configDir})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), `profile "default" is already signed in`) {
+		t.Fatalf("error = %q, want existing session message", err.Error())
 	}
 }

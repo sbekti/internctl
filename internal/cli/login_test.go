@@ -19,22 +19,38 @@ func TestAuthVerificationURL(t *testing.T) {
 	tests := []struct {
 		name      string
 		serverURL string
+		userCode  string
 		want      string
 	}{
 		{
 			name:      "uses contacted server origin",
 			serverURL: "http://192.168.64.6:3000",
-			want:      "http://192.168.64.6:3000/auth/device",
+			userCode:  "ABCD-EFGH",
+			want:      "http://192.168.64.6:3000/auth/device?user_code=ABCD-EFGH",
 		},
 		{
 			name:      "trims trailing slash",
 			serverURL: "https://intern.corp.example.com/",
-			want:      "https://intern.corp.example.com/auth/device",
+			userCode:  "ABCD-EFGH",
+			want:      "https://intern.corp.example.com/auth/device?user_code=ABCD-EFGH",
 		},
 		{
 			name:      "preserves existing path prefix",
 			serverURL: "https://example.com/base",
-			want:      "https://example.com/base/auth/device",
+			userCode:  "EFGH-1234",
+			want:      "https://example.com/base/auth/device?user_code=EFGH-1234",
+		},
+		{
+			name:      "encodes user code characters",
+			serverURL: "https://example.com",
+			userCode:  "ABCD EFGH",
+			want:      "https://example.com/auth/device?user_code=ABCD+EFGH",
+		},
+		{
+			name:      "drops existing query and fragment",
+			serverURL: "https://example.com/base?foo=bar#section",
+			userCode:  "ABCD-EFGH",
+			want:      "https://example.com/base/auth/device?user_code=ABCD-EFGH",
 		},
 	}
 
@@ -43,7 +59,7 @@ func TestAuthVerificationURL(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := authVerificationURL(test.serverURL)
+			got := authVerificationURL(test.serverURL, test.userCode)
 			if got != test.want {
 				t.Fatalf("authVerificationURL = %q, want %q", got, test.want)
 			}

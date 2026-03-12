@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -20,6 +21,7 @@ func newLoginCommand(options *RootOptions) *cobra.Command {
 	var serverURL string
 	var tokenBackend string
 	var clientName string
+	var force bool
 
 	cmd := &cobra.Command{
 		Use:   "login",
@@ -51,6 +53,17 @@ func newLoginCommand(options *RootOptions) *cobra.Command {
 				resolvedClientName = detectHostname()
 			}
 
+			if !force {
+				if _, _, err := runtime.Sessions.Load(runtime.Profile, session.BackendAuto); err == nil {
+					return fmt.Errorf(
+						"profile %q is already signed in; use --force to replace the existing session or run logout first",
+						runtime.Profile,
+					)
+				} else if !errors.Is(err, session.ErrSessionNotFound) {
+					return err
+				}
+			}
+
 			client, err := httpclient.New(resolvedServerURL, runtime.Profile, selectedBackend, runtime.Sessions)
 			if err != nil {
 				return err
@@ -60,7 +73,7 @@ func newLoginCommand(options *RootOptions) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			verificationURL := authVerificationURL(resolvedServerURL)
+			verificationURL := authVerificationURL(resolvedServerURL, deviceCode.UserCode)
 
 			fmt.Fprintln(cmd.OutOrStdout(), "Open the verification URL in a browser and approve:")
 			fmt.Fprintf(cmd.OutOrStdout(), "Verification URL: %s\n", verificationURL)
@@ -111,6 +124,7 @@ func newLoginCommand(options *RootOptions) *cobra.Command {
 		"Token storage backend: auto, keyring, or file",
 	)
 	cmd.Flags().StringVar(&clientName, "client-name", "", "Client name sent during device login")
+	cmd.Flags().BoolVar(&force, "force", false, "Replace an existing saved session for the selected profile")
 
 	return cmd
 }
@@ -192,6 +206,20 @@ func selectLoginBackend(cmd *cobra.Command, flagValue string, savedValue string)
 	return session.ParseBackend(flagValue)
 }
 
-func authVerificationURL(serverURL string) string {
-	return strings.TrimRight(strings.TrimSpace(serverURL), "/") + "/auth/device"
+func authVerificationURL(serverURL string, userCode string) string {
+	trimmedServerURL := strings.TrimSpace(serverURL)
+	trimmedUserCode := strings.TrimSpace(userCode)
+
+	parsed, err := url.Parse(trimmedServerURL)
+	if err != nil {
+		return strings.TrimRight(trimmedServerURL, "/") + "/auth/device?user_code=" + url.QueryEscape(trimmedUserCode)
+	}
+
+	parsed.Path = strings.TrimRight(parsed.Path, "/") + "/auth/device"
+	parsed.Fragment = ""
+	query := url.Values{}
+	query.Set("user_code", trimmedUserCode)
+	parsed.RawQuery = query.Encode()
+
+	return parsed.String()
 }
