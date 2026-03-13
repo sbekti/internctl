@@ -14,6 +14,34 @@ import (
 	"github.com/sbekti/internctl/internal/session"
 )
 
+func writeLoggedInProfile(t *testing.T, configDir string, serverURL string) *session.Manager {
+	t.Helper()
+
+	cfg := config.File{
+		Profiles: map[string]config.Profile{
+			config.DefaultProfile: {
+				ServerURL:    serverURL,
+				TokenBackend: "file",
+			},
+		},
+	}
+	if err := config.Save(configDir, cfg); err != nil {
+		t.Fatalf("Save config returned error: %v", err)
+	}
+
+	manager := session.NewManager(configDir)
+	if _, err := manager.Save(config.DefaultProfile, session.BackendFile, session.Data{
+		AccessToken:  "access-token",
+		RefreshToken: "refresh-token",
+		TokenType:    "Bearer",
+		ExpiresAt:    time.Now().Add(time.Minute),
+	}); err != nil {
+		t.Fatalf("Save session returned error: %v", err)
+	}
+
+	return manager
+}
+
 func TestLoginPersistsProfileAndSession(t *testing.T) {
 	t.Parallel()
 
@@ -199,5 +227,74 @@ func TestLoginRefusesToReplaceExistingSessionWithoutForce(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), `profile "default" is already signed in`) {
 		t.Fatalf("error = %q, want existing session message", err.Error())
+	}
+}
+
+func TestVlansListPrintsTable(t *testing.T) {
+	t.Parallel()
+
+	configDir := t.TempDir()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/networks/vlans" {
+			http.NotFound(w, r)
+			return
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer access-token" {
+			t.Fatalf("Authorization header = %q, want %q", got, "Bearer access-token")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"items":[{"id":1,"name":"guest","vlan_id":10,"description":"Guest devices","is_active":true,"created_at":"2026-03-13T00:00:00Z","updated_at":"2026-03-13T00:00:00Z"}]}`))
+	}))
+	defer server.Close()
+
+	writeLoggedInProfile(t, configDir, server.URL)
+
+	cmd := NewRootCommand()
+	var stdout bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetArgs([]string{"vlans", "list", "--config-dir", configDir})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "ID") || !strings.Contains(output, "VLAN ID") || !strings.Contains(output, "ACTIVE") {
+		t.Fatalf("stdout missing table headers: %s", output)
+	}
+	if !strings.Contains(output, "guest") || !strings.Contains(output, "10") || !strings.Contains(output, "yes") {
+		t.Fatalf("stdout missing VLAN row: %s", output)
+	}
+}
+
+func TestDevicesListRequiresAdmin(t *testing.T) {
+	t.Parallel()
+
+	configDir := t.TempDir()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/networks/devices" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"code":"forbidden","message":"admin access required"}`))
+	}))
+	defer server.Close()
+
+	writeLoggedInProfile(t, configDir, server.URL)
+
+	cmd := NewRootCommand()
+	cmd.SetOut(new(bytes.Buffer))
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetArgs([]string{"devices", "list", "--config-dir", configDir})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "admin access is required to list devices") {
+		t.Fatalf("error = %q, want admin access message", err.Error())
 	}
 }

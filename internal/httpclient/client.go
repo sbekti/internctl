@@ -17,6 +17,7 @@ import (
 )
 
 var ErrUnauthorized = errors.New("unauthorized")
+var ErrForbidden = errors.New("forbidden")
 
 type Client struct {
 	baseURL       string
@@ -174,6 +175,42 @@ func (c *Client) GetProfile(ctx context.Context) (*api.Profile, error) {
 		return nil, ErrUnauthorized
 	default:
 		return nil, unexpectedStatus("get profile", resp.StatusCode(), resp.Body)
+	}
+}
+
+func (c *Client) ListVlans(ctx context.Context) ([]api.Vlan, error) {
+	resp, err := c.authenticated.ListVlansWithResponse(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	switch resp.StatusCode() {
+	case http.StatusOK:
+		return resp.JSON200.Items, nil
+	case http.StatusUnauthorized:
+		return nil, ErrUnauthorized
+	case http.StatusForbidden:
+		return nil, ErrForbidden
+	default:
+		return nil, unexpectedStatus("list vlans", resp.StatusCode(), resp.Body)
+	}
+}
+
+func (c *Client) ListNetworkDevices(ctx context.Context) ([]api.NetworkDevice, error) {
+	resp, err := c.authenticated.ListNetworkDevicesWithResponse(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	switch resp.StatusCode() {
+	case http.StatusOK:
+		return resp.JSON200.Items, nil
+	case http.StatusUnauthorized:
+		return nil, ErrUnauthorized
+	case http.StatusForbidden:
+		return nil, ErrForbidden
+	default:
+		return nil, unexpectedStatus("list network devices", resp.StatusCode(), resp.Body)
 	}
 }
 

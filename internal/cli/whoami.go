@@ -7,7 +7,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/sbekti/internctl/internal/config"
 	"github.com/sbekti/internctl/internal/httpclient"
 	"github.com/sbekti/internctl/internal/session"
 )
@@ -22,18 +21,7 @@ func newWhoamiCommand(options *RootOptions) *cobra.Command {
 				return err
 			}
 
-			profileCfg := runtime.ProfileConfig()
-			serverURL := strings.TrimSpace(profileCfg.ServerURL)
-			if serverURL == "" {
-				serverURL = config.DefaultServerURL
-			}
-
-			selectedBackend, err := session.ParseBackend(profileCfg.TokenBackend)
-			if err != nil {
-				selectedBackend = session.BackendAuto
-			}
-
-			client, err := httpclient.New(serverURL, runtime.Profile, selectedBackend, runtime.Sessions)
+			client, err := runtime.NewAuthenticatedClient()
 			if err != nil {
 				return err
 			}
@@ -50,7 +38,7 @@ func newWhoamiCommand(options *RootOptions) *cobra.Command {
 			}
 
 			fmt.Fprintf(cmd.OutOrStdout(), "Profile: %s\n", runtime.Profile)
-			fmt.Fprintf(cmd.OutOrStdout(), "Server: %s\n", serverURL)
+			fmt.Fprintf(cmd.OutOrStdout(), "Server: %s\n", runtime.ServerURL())
 			fmt.Fprintf(cmd.OutOrStdout(), "Username: %s\n", profile.Username)
 			fmt.Fprintf(cmd.OutOrStdout(), "Name: %s\n", profile.Name)
 			fmt.Fprintf(cmd.OutOrStdout(), "Email: %s\n", string(profile.Email))

@@ -2,8 +2,10 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/sbekti/internctl/internal/config"
+	"github.com/sbekti/internctl/internal/httpclient"
 	"github.com/sbekti/internctl/internal/session"
 )
 
@@ -48,4 +50,24 @@ func (r *Runtime) SaveProfile(profile config.Profile) error {
 		return fmt.Errorf("save config: %w", err)
 	}
 	return nil
+}
+
+func (r *Runtime) ServerURL() string {
+	serverURL := strings.TrimSpace(r.ProfileConfig().ServerURL)
+	if serverURL == "" {
+		return config.DefaultServerURL
+	}
+	return serverURL
+}
+
+func (r *Runtime) SelectedBackend() session.Backend {
+	selectedBackend, err := session.ParseBackend(r.ProfileConfig().TokenBackend)
+	if err != nil {
+		return session.BackendAuto
+	}
+	return selectedBackend
+}
+
+func (r *Runtime) NewAuthenticatedClient() (*httpclient.Client, error) {
+	return httpclient.New(r.ServerURL(), r.Profile, r.SelectedBackend(), r.Sessions)
 }
