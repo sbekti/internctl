@@ -2272,6 +2272,7 @@ type ApproveDeviceCodeResponse struct {
 	JSON401      *Unauthorized
 	JSON404      *NotFound
 	JSON409      *Conflict
+	JSON429      *TooManyRequests
 }
 
 // Status returns HTTPResponse.Status
@@ -2297,6 +2298,7 @@ type DenyDeviceCodeResponse struct {
 	JSON401      *Unauthorized
 	JSON404      *NotFound
 	JSON409      *Conflict
+	JSON429      *TooManyRequests
 }
 
 // Status returns HTTPResponse.Status
@@ -2343,6 +2345,7 @@ type ExchangeDeviceCodeResponse struct {
 	JSON200      *TokenResponse
 	JSON400      *ClientAuthError
 	JSON428      *ClientAuthError
+	JSON429      *TooManyRequests
 }
 
 // Status returns HTTPResponse.Status
@@ -2761,6 +2764,7 @@ type RevokeProfileSessionResponse struct {
 	HTTPResponse *http.Response
 	JSON400      *BadRequest
 	JSON401      *Unauthorized
+	JSON429      *TooManyRequests
 }
 
 // Status returns HTTPResponse.Status
@@ -3320,6 +3324,13 @@ func ParseApproveDeviceCodeResponse(rsp *http.Response) (*ApproveDeviceCodeRespo
 		}
 		response.JSON409 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
 	}
 
 	return response, nil
@@ -3366,6 +3377,13 @@ func ParseDenyDeviceCodeResponse(rsp *http.Response) (*DenyDeviceCodeResponse, e
 			return nil, err
 		}
 		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
 
 	}
 
@@ -3432,6 +3450,13 @@ func ParseExchangeDeviceCodeResponse(rsp *http.Response) (*ExchangeDeviceCodeRes
 			return nil, err
 		}
 		response.JSON428 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
 
 	}
 
@@ -4182,6 +4207,13 @@ func ParseRevokeProfileSessionResponse(rsp *http.Response) (*RevokeProfileSessio
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
 
 	}
 

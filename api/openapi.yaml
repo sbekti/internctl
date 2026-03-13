@@ -121,6 +121,8 @@ paths:
           description: Session revoked or already absent.
         '400':
           $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '401':
           $ref: '#/components/responses/Unauthorized'
   /api/v1/profile/sessions/revoke_others:
@@ -552,6 +554,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
@@ -572,6 +576,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
@@ -607,6 +613,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ClientAuthError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
   /api/v1/auth/tokens/refresh:
     post:
       operationId: refreshAccessToken
