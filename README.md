@@ -10,8 +10,8 @@ Current scope:
 - keyring-first token storage with file fallback
 - `whoami`
 - `logout`
-- `vlans list|create|update|delete`
-- `devices list|create|update|delete`
+- `vlan list|create|update|delete`
+- `device list|create|update|delete`
 - list commands support `--output table|json`
 
 ## Usage
@@ -19,10 +19,10 @@ Current scope:
 ```bash
 internctl login --server http://localhost:18080
 internctl whoami
-internctl vlans list
-internctl devices list --output json
-internctl vlans create --name iot --vlan-id 20 --description "IoT devices" --active
-internctl devices create --name "Kitchen TV" --mac-address aa:bb:cc:dd:ee:ff --vlan-id 1
+internctl vlan list
+internctl device list --output json
+internctl vlan create --name iot --vlan-id 20 --description "IoT devices" --active
+internctl device create --name "Kitchen TV" --mac-address aa:bb:cc:dd:ee:ff --vlan-id 1
 internctl logout
 ```
 

@@ -499,6 +499,43 @@ func TestDevicesListPrintsIDAndSupportsJSONOutput(t *testing.T) {
 	}
 }
 
+func TestSingularDeviceAndVlanCommandsWork(t *testing.T) {
+	t.Parallel()
+
+	configDir := t.TempDir()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/networks/vlans":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"items":[]}`))
+		case "/api/v1/networks/devices":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"items":[]}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	writeLoggedInProfile(t, configDir, server.URL)
+
+	vlanCmd := NewRootCommand()
+	vlanCmd.SetOut(new(bytes.Buffer))
+	vlanCmd.SetErr(new(bytes.Buffer))
+	vlanCmd.SetArgs([]string{"vlan", "list", "--config-dir", configDir})
+	if err := vlanCmd.Execute(); err != nil {
+		t.Fatalf("vlan command returned error: %v", err)
+	}
+
+	deviceCmd := NewRootCommand()
+	deviceCmd.SetOut(new(bytes.Buffer))
+	deviceCmd.SetErr(new(bytes.Buffer))
+	deviceCmd.SetArgs([]string{"device", "list", "--config-dir", configDir})
+	if err := deviceCmd.Execute(); err != nil {
+		t.Fatalf("device command returned error: %v", err)
+	}
+}
+
 func TestDevicesDeleteRequiresAdmin(t *testing.T) {
 	t.Parallel()
 

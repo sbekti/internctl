@@ -14,7 +14,20 @@ import (
 
 func newVlansCommand(options *RootOptions) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "vlans",
+		Use:    "vlans",
+		Short:  "Manage VLANs",
+		Hidden: true,
+	}
+	cmd.AddCommand(newVlansListCommand(options))
+	cmd.AddCommand(newVlansCreateCommand(options))
+	cmd.AddCommand(newVlansUpdateCommand(options))
+	cmd.AddCommand(newVlansDeleteCommand(options))
+	return cmd
+}
+
+func newVlanCommand(options *RootOptions) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "vlan",
 		Short: "Manage VLANs",
 	}
 	cmd.AddCommand(newVlansListCommand(options))

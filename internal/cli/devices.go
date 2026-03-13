@@ -14,7 +14,20 @@ import (
 
 func newDevicesCommand(options *RootOptions) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "devices",
+		Use:    "devices",
+		Short:  "Manage network devices",
+		Hidden: true,
+	}
+	cmd.AddCommand(newDevicesListCommand(options))
+	cmd.AddCommand(newDevicesCreateCommand(options))
+	cmd.AddCommand(newDevicesUpdateCommand(options))
+	cmd.AddCommand(newDevicesDeleteCommand(options))
+	return cmd
+}
+
+func newDeviceCommand(options *RootOptions) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "device",
 		Short: "Manage network devices",
 	}
 	cmd.AddCommand(newDevicesListCommand(options))
