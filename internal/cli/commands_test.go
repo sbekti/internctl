@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,6 +15,10 @@ import (
 	"github.com/sbekti/internctl/internal/config"
 	"github.com/sbekti/internctl/internal/session"
 )
+
+func authSessionPageJSON(items string, limit int32, offset int32, total int64) string {
+	return fmt.Sprintf(`{"items":%s,"pagination":{"limit":%d,"offset":%d,"total":%d}}`, items, limit, offset, total)
+}
 
 func writeLoggedInProfile(t *testing.T, configDir string, serverURL string) *session.Manager {
 	t.Helper()
@@ -527,5 +532,149 @@ func TestDevicesDeleteRequiresAdmin(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "admin access is required to delete devices") {
 		t.Fatalf("error = %q, want admin access message", err.Error())
+	}
+}
+
+func TestSessionListPrintsCurrentSessionAndPagination(t *testing.T) {
+	t.Parallel()
+
+	configDir := t.TempDir()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/profile/sessions" {
+			http.NotFound(w, r)
+			return
+		}
+		if got := r.URL.Query().Get("limit"); got != "20" {
+			t.Fatalf("limit = %q, want 20", got)
+		}
+		if got := r.URL.Query().Get("offset"); got != "0" {
+			t.Fatalf("offset = %q, want 0", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(authSessionPageJSON(
+			`[{"id":"00000000-0000-0000-0000-000000000111","username":"bob","client_name":"internctl","created_at":"2026-03-13T00:00:00Z","expires_at":"2026-03-14T00:00:00Z","idle_expires_at":"2026-03-13T12:00:00Z","last_used_at":"2026-03-13T01:00:00Z","is_current":true}]`,
+			20, 0, 1,
+		)))
+	}))
+	defer server.Close()
+
+	writeLoggedInProfile(t, configDir, server.URL)
+
+	cmd := NewRootCommand()
+	var stdout bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetArgs([]string{"session", "list", "--config-dir", configDir})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "CURRENT") || !strings.Contains(output, "yes") || !strings.Contains(output, "internctl") {
+		t.Fatalf("stdout missing session table fields: %s", output)
+	}
+	if !strings.Contains(output, "Page 1 of 1 (20 per page, 1 total)") {
+		t.Fatalf("stdout missing page summary: %s", output)
+	}
+}
+
+func TestSessionListAllJSONUsesAdminEndpoint(t *testing.T) {
+	t.Parallel()
+
+	configDir := t.TempDir()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/admin/auth/sessions" {
+			http.NotFound(w, r)
+			return
+		}
+		if got := r.URL.Query().Get("limit"); got != "5" {
+			t.Fatalf("limit = %q, want 5", got)
+		}
+		if got := r.URL.Query().Get("offset"); got != "5" {
+			t.Fatalf("offset = %q, want 5", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(authSessionPageJSON(
+			`[{"id":"00000000-0000-0000-0000-000000000222","username":"alice","client_name":"mobile","created_at":"2026-03-13T00:00:00Z","expires_at":"2026-03-14T00:00:00Z","idle_expires_at":"2026-03-13T12:00:00Z","is_current":false}]`,
+			5, 5, 17,
+		)))
+	}))
+	defer server.Close()
+
+	writeLoggedInProfile(t, configDir, server.URL)
+
+	cmd := NewRootCommand()
+	var stdout bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetArgs([]string{"session", "list", "--config-dir", configDir, "--all", "--page", "2", "--page-size", "5", "--output", "json"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, `"username": "alice"`) || !strings.Contains(output, `"total": 17`) {
+		t.Fatalf("stdout missing admin session JSON fields: %s", output)
+	}
+}
+
+func TestSessionRevokeAllPromptsAndAborts(t *testing.T) {
+	t.Parallel()
+
+	configDir := t.TempDir()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+	}))
+	defer server.Close()
+
+	writeLoggedInProfile(t, configDir, server.URL)
+
+	cmd := NewRootCommand()
+	var stdout bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetIn(strings.NewReader("n\n"))
+	cmd.SetArgs([]string{"session", "revoke-all", "--config-dir", configDir})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+	if err.Error() != "aborted" {
+		t.Fatalf("error = %q, want aborted", err.Error())
+	}
+	if !strings.Contains(stdout.String(), "Revoke all of your other client sessions? [y/N]: ") {
+		t.Fatalf("stdout missing confirmation prompt: %s", stdout.String())
+	}
+}
+
+func TestSessionRevokeAllAdminWithYes(t *testing.T) {
+	t.Parallel()
+
+	configDir := t.TempDir()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/admin/auth/sessions/revoke_all" || r.Method != http.MethodPost {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	writeLoggedInProfile(t, configDir, server.URL)
+
+	cmd := NewRootCommand()
+	var stdout bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetArgs([]string{"session", "revoke-all", "--config-dir", configDir, "--all", "--yes"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "Revoked all client sessions across all users.") {
+		t.Fatalf("stdout missing revoke-all confirmation: %s", stdout.String())
 	}
 }

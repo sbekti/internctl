@@ -365,6 +365,127 @@ func (c *Client) DeleteNetworkDevice(ctx context.Context, id string) error {
 	}
 }
 
+func (c *Client) ListSessions(ctx context.Context, all bool, limit, offset int32) (*api.AuthSessionPage, error) {
+	if all {
+		params := &api.ListAdminAuthSessionsParams{
+			Limit:  &limit,
+			Offset: &offset,
+		}
+		resp, err := c.authenticated.ListAdminAuthSessionsWithResponse(ctx, params)
+		if err != nil {
+			return nil, err
+		}
+
+		switch resp.StatusCode() {
+		case http.StatusOK:
+			return resp.JSON200, nil
+		case http.StatusUnauthorized:
+			return nil, ErrUnauthorized
+		case http.StatusForbidden:
+			return nil, ErrForbidden
+		default:
+			return nil, unexpectedStatus("list admin sessions", resp.StatusCode(), resp.Body)
+		}
+	}
+
+	params := &api.ListProfileSessionsParams{
+		Limit:  &limit,
+		Offset: &offset,
+	}
+	resp, err := c.authenticated.ListProfileSessionsWithResponse(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	switch resp.StatusCode() {
+	case http.StatusOK:
+		return resp.JSON200, nil
+	case http.StatusUnauthorized:
+		return nil, ErrUnauthorized
+	default:
+		return nil, unexpectedStatus("list sessions", resp.StatusCode(), resp.Body)
+	}
+}
+
+func (c *Client) RevokeSession(ctx context.Context, id string, all bool) error {
+	parsedID, err := uuid.Parse(id)
+	if err != nil {
+		return fmt.Errorf("parse session id: %w", err)
+	}
+
+	if all {
+		resp, err := c.authenticated.RevokeAdminAuthSessionWithResponse(ctx, api.SessionId(parsedID))
+		if err != nil {
+			return err
+		}
+
+		switch resp.StatusCode() {
+		case http.StatusNoContent:
+			return nil
+		case http.StatusUnauthorized:
+			return ErrUnauthorized
+		case http.StatusForbidden:
+			return ErrForbidden
+		case http.StatusBadRequest:
+			return newAPIError(resp.StatusCode(), resp.JSON400)
+		default:
+			return unexpectedStatus("revoke admin session", resp.StatusCode(), resp.Body)
+		}
+	}
+
+	resp, err := c.authenticated.RevokeProfileSessionWithResponse(ctx, api.SessionId(parsedID))
+	if err != nil {
+		return err
+	}
+
+	switch resp.StatusCode() {
+	case http.StatusNoContent:
+		return nil
+	case http.StatusUnauthorized:
+		return ErrUnauthorized
+	case http.StatusBadRequest:
+		return newAPIError(resp.StatusCode(), resp.JSON400)
+	case http.StatusTooManyRequests:
+		return newAPIError(resp.StatusCode(), resp.JSON429)
+	default:
+		return unexpectedStatus("revoke session", resp.StatusCode(), resp.Body)
+	}
+}
+
+func (c *Client) RevokeAllSessions(ctx context.Context, all bool) error {
+	if all {
+		resp, err := c.authenticated.RevokeAllAdminAuthSessionsWithResponse(ctx)
+		if err != nil {
+			return err
+		}
+
+		switch resp.StatusCode() {
+		case http.StatusNoContent:
+			return nil
+		case http.StatusUnauthorized:
+			return ErrUnauthorized
+		case http.StatusForbidden:
+			return ErrForbidden
+		default:
+			return unexpectedStatus("revoke all admin sessions", resp.StatusCode(), resp.Body)
+		}
+	}
+
+	resp, err := c.authenticated.RevokeOtherProfileSessionsWithResponse(ctx)
+	if err != nil {
+		return err
+	}
+
+	switch resp.StatusCode() {
+	case http.StatusNoContent:
+		return nil
+	case http.StatusUnauthorized:
+		return ErrUnauthorized
+	default:
+		return unexpectedStatus("revoke all sessions", resp.StatusCode(), resp.Body)
+	}
+}
+
 func (t *AuthTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	current, actualBackend, err := t.sessions.Load(t.profile, t.backend)
 	if err != nil {

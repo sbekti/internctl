@@ -37,6 +37,7 @@ func NewRootCommand() *cobra.Command {
 	cmd.AddCommand(newLoginCommand(options))
 	cmd.AddCommand(newLogoutCommand(options))
 	cmd.AddCommand(newWhoamiCommand(options))
+	cmd.AddCommand(newSessionCommand(options))
 	cmd.AddCommand(newVlanCommand(options))
 	cmd.AddCommand(newDeviceCommand(options))
 
