@@ -10,12 +10,16 @@ Current scope:
 - keyring-first token storage with file fallback
 - `whoami`
 - `logout`
+- `vlans list|create|update|delete`
+- `devices list`
 
 ## Usage
 
 ```bash
 internctl login --server http://localhost:18080
 internctl whoami
+internctl vlans list
+internctl vlans create --name iot --vlan-id 20 --description "IoT devices" --active
 internctl logout
 ```
 

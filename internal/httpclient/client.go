@@ -214,6 +214,77 @@ func (c *Client) ListNetworkDevices(ctx context.Context) ([]api.NetworkDevice, e
 	}
 }
 
+func (c *Client) CreateVlan(ctx context.Context, body api.VlanWrite) (*api.Vlan, error) {
+	resp, err := c.authenticated.CreateVlanWithResponse(ctx, body)
+	if err != nil {
+		return nil, err
+	}
+
+	switch resp.StatusCode() {
+	case http.StatusCreated:
+		return resp.JSON201, nil
+	case http.StatusUnauthorized:
+		return nil, ErrUnauthorized
+	case http.StatusForbidden:
+		return nil, ErrForbidden
+	case http.StatusBadRequest:
+		return nil, newAPIError(resp.StatusCode(), resp.JSON400)
+	case http.StatusConflict:
+		return nil, newAPIError(resp.StatusCode(), resp.JSON409)
+	default:
+		return nil, unexpectedStatus("create vlan", resp.StatusCode(), resp.Body)
+	}
+}
+
+func (c *Client) UpdateVlan(ctx context.Context, id int64, body api.VlanPatch) (*api.Vlan, error) {
+	resp, err := c.authenticated.PatchVlanWithResponse(ctx, api.VlanId(id), body)
+	if err != nil {
+		return nil, err
+	}
+
+	switch resp.StatusCode() {
+	case http.StatusOK:
+		return resp.JSON200, nil
+	case http.StatusUnauthorized:
+		return nil, ErrUnauthorized
+	case http.StatusForbidden:
+		return nil, ErrForbidden
+	case http.StatusBadRequest:
+		return nil, newAPIError(resp.StatusCode(), resp.JSON400)
+	case http.StatusNotFound:
+		return nil, newAPIError(resp.StatusCode(), &api.ErrorResponse{
+			Code:    resp.JSON404.Code,
+			Message: resp.JSON404.Message,
+		})
+	case http.StatusConflict:
+		return nil, newAPIError(resp.StatusCode(), resp.JSON409)
+	default:
+		return nil, unexpectedStatus("update vlan", resp.StatusCode(), resp.Body)
+	}
+}
+
+func (c *Client) DeleteVlan(ctx context.Context, id int64) error {
+	resp, err := c.authenticated.DeleteVlanWithResponse(ctx, api.VlanId(id))
+	if err != nil {
+		return err
+	}
+
+	switch resp.StatusCode() {
+	case http.StatusNoContent:
+		return nil
+	case http.StatusUnauthorized:
+		return ErrUnauthorized
+	case http.StatusForbidden:
+		return ErrForbidden
+	case http.StatusBadRequest:
+		return newAPIError(resp.StatusCode(), resp.JSON400)
+	case http.StatusConflict:
+		return newAPIError(resp.StatusCode(), resp.JSON409)
+	default:
+		return unexpectedStatus("delete vlan", resp.StatusCode(), resp.Body)
+	}
+}
+
 func (t *AuthTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	current, actualBackend, err := t.sessions.Load(t.profile, t.backend)
 	if err != nil {

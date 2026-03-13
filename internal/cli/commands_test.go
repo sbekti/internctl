@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sbekti/internctl/internal/api"
 	"github.com/sbekti/internctl/internal/config"
 	"github.com/sbekti/internctl/internal/session"
 )
@@ -295,6 +296,88 @@ func TestDevicesListRequiresAdmin(t *testing.T) {
 		t.Fatalf("expected error, got nil")
 	}
 	if !strings.Contains(err.Error(), "admin access is required to list devices") {
+		t.Fatalf("error = %q, want admin access message", err.Error())
+	}
+}
+
+func TestVlansCreatePrintsCreatedMessage(t *testing.T) {
+	t.Parallel()
+
+	configDir := t.TempDir()
+	var request api.VlanWrite
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/networks/vlans" || r.Method != http.MethodPost {
+			http.NotFound(w, r)
+			return
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"id":42,"name":"iot","vlan_id":20,"description":"IoT devices","is_active":true,"created_at":"2026-03-13T00:00:00Z","updated_at":"2026-03-13T00:00:00Z"}`))
+	}))
+	defer server.Close()
+
+	writeLoggedInProfile(t, configDir, server.URL)
+
+	cmd := NewRootCommand()
+	var stdout bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetArgs([]string{
+		"vlans", "create",
+		"--config-dir", configDir,
+		"--name", "iot",
+		"--vlan-id", "20",
+		"--description", "IoT devices",
+		"--active",
+	})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if request.Name != "iot" || request.VlanId != 20 {
+		t.Fatalf("unexpected create request: %+v", request)
+	}
+	if request.Description == nil || *request.Description != "IoT devices" {
+		t.Fatalf("description = %+v, want IoT devices", request.Description)
+	}
+	if request.IsActive == nil || !*request.IsActive {
+		t.Fatalf("is_active = %+v, want true", request.IsActive)
+	}
+	if !strings.Contains(stdout.String(), "Created VLAN 42 (iot).") {
+		t.Fatalf("stdout missing create confirmation: %s", stdout.String())
+	}
+}
+
+func TestVlansDeleteRequiresAdmin(t *testing.T) {
+	t.Parallel()
+
+	configDir := t.TempDir()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/networks/vlans/42" || r.Method != http.MethodDelete {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"code":"forbidden","message":"admin access required"}`))
+	}))
+	defer server.Close()
+
+	writeLoggedInProfile(t, configDir, server.URL)
+
+	cmd := NewRootCommand()
+	cmd.SetOut(new(bytes.Buffer))
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetArgs([]string{"vlans", "delete", "42", "--config-dir", configDir})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "admin access is required to delete VLANs") {
 		t.Fatalf("error = %q, want admin access message", err.Error())
 	}
 }
