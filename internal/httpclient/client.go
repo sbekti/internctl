@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/sbekti/internctl/internal/api"
 	"github.com/sbekti/internctl/internal/session"
 )
@@ -282,6 +283,85 @@ func (c *Client) DeleteVlan(ctx context.Context, id int64) error {
 		return newAPIError(resp.StatusCode(), resp.JSON409)
 	default:
 		return unexpectedStatus("delete vlan", resp.StatusCode(), resp.Body)
+	}
+}
+
+func (c *Client) CreateNetworkDevice(ctx context.Context, body api.NetworkDeviceWrite) (*api.NetworkDevice, error) {
+	resp, err := c.authenticated.CreateNetworkDeviceWithResponse(ctx, body)
+	if err != nil {
+		return nil, err
+	}
+
+	switch resp.StatusCode() {
+	case http.StatusCreated:
+		return resp.JSON201, nil
+	case http.StatusUnauthorized:
+		return nil, ErrUnauthorized
+	case http.StatusForbidden:
+		return nil, ErrForbidden
+	case http.StatusBadRequest:
+		return nil, newAPIError(resp.StatusCode(), resp.JSON400)
+	case http.StatusConflict:
+		return nil, newAPIError(resp.StatusCode(), resp.JSON409)
+	default:
+		return nil, unexpectedStatus("create network device", resp.StatusCode(), resp.Body)
+	}
+}
+
+func (c *Client) UpdateNetworkDevice(ctx context.Context, id string, body api.NetworkDevicePatch) (*api.NetworkDevice, error) {
+	parsedID, err := uuid.Parse(id)
+	if err != nil {
+		return nil, fmt.Errorf("parse device id: %w", err)
+	}
+
+	resp, err := c.authenticated.PatchNetworkDeviceWithResponse(ctx, api.DeviceId(parsedID), body)
+	if err != nil {
+		return nil, err
+	}
+
+	switch resp.StatusCode() {
+	case http.StatusOK:
+		return resp.JSON200, nil
+	case http.StatusUnauthorized:
+		return nil, ErrUnauthorized
+	case http.StatusForbidden:
+		return nil, ErrForbidden
+	case http.StatusBadRequest:
+		return nil, newAPIError(resp.StatusCode(), resp.JSON400)
+	case http.StatusNotFound:
+		return nil, newAPIError(resp.StatusCode(), &api.ErrorResponse{
+			Code:    resp.JSON404.Code,
+			Message: resp.JSON404.Message,
+		})
+	case http.StatusConflict:
+		return nil, newAPIError(resp.StatusCode(), resp.JSON409)
+	default:
+		return nil, unexpectedStatus("update network device", resp.StatusCode(), resp.Body)
+	}
+}
+
+func (c *Client) DeleteNetworkDevice(ctx context.Context, id string) error {
+	parsedID, err := uuid.Parse(id)
+	if err != nil {
+		return fmt.Errorf("parse device id: %w", err)
+	}
+
+	resp, err := c.authenticated.DeleteNetworkDeviceWithResponse(ctx, api.DeviceId(parsedID))
+	if err != nil {
+		return err
+	}
+
+	switch resp.StatusCode() {
+	case http.StatusNoContent:
+		return nil
+	case http.StatusUnauthorized:
+		return ErrUnauthorized
+	case http.StatusForbidden:
+		return ErrForbidden
+	case http.StatusBadRequest:
+		return newAPIError(resp.StatusCode(), resp.JSON400)
+	default:
+		return unexpectedStatus("delete network device", resp.StatusCode(), resp.Body)
 	}
 }
 

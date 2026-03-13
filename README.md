@@ -11,7 +11,7 @@ Current scope:
 - `whoami`
 - `logout`
 - `vlans list|create|update|delete`
-- `devices list`
+- `devices list|create|update|delete`
 
 ## Usage
 
@@ -20,6 +20,7 @@ internctl login --server http://localhost:18080
 internctl whoami
 internctl vlans list
 internctl vlans create --name iot --vlan-id 20 --description "IoT devices" --active
+internctl devices create --name "Kitchen TV" --mac-address aa:bb:cc:dd:ee:ff --vlan-id 1
 internctl logout
 ```
 

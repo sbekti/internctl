@@ -381,3 +381,78 @@ func TestVlansDeleteRequiresAdmin(t *testing.T) {
 		t.Fatalf("error = %q, want admin access message", err.Error())
 	}
 }
+
+func TestDevicesCreatePrintsCreatedMessage(t *testing.T) {
+	t.Parallel()
+
+	configDir := t.TempDir()
+	var request api.NetworkDeviceWrite
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/networks/devices" || r.Method != http.MethodPost {
+			http.NotFound(w, r)
+			return
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"id":"00000000-0000-0000-0000-000000000123","display_name":"Kitchen TV","mac_address":"aa:bb:cc:dd:ee:ff","vlan":{"id":1,"name":"trusted","vlan_id":1},"created_at":"2026-03-13T00:00:00Z","updated_at":"2026-03-13T00:00:00Z"}`))
+	}))
+	defer server.Close()
+
+	writeLoggedInProfile(t, configDir, server.URL)
+
+	cmd := NewRootCommand()
+	var stdout bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetArgs([]string{
+		"devices", "create",
+		"--config-dir", configDir,
+		"--name", "Kitchen TV",
+		"--mac-address", "aa:bb:cc:dd:ee:ff",
+		"--vlan-id", "1",
+	})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if request.DisplayName != "Kitchen TV" || request.MacAddress != "aa:bb:cc:dd:ee:ff" || request.VlanId != 1 {
+		t.Fatalf("unexpected create request: %+v", request)
+	}
+	if !strings.Contains(stdout.String(), "Created device Kitchen TV (00000000-0000-0000-0000-000000000123).") {
+		t.Fatalf("stdout missing create confirmation: %s", stdout.String())
+	}
+}
+
+func TestDevicesDeleteRequiresAdmin(t *testing.T) {
+	t.Parallel()
+
+	configDir := t.TempDir()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/networks/devices/00000000-0000-0000-0000-000000000123" || r.Method != http.MethodDelete {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"code":"forbidden","message":"admin access required"}`))
+	}))
+	defer server.Close()
+
+	writeLoggedInProfile(t, configDir, server.URL)
+
+	cmd := NewRootCommand()
+	cmd.SetOut(new(bytes.Buffer))
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetArgs([]string{"devices", "delete", "00000000-0000-0000-0000-000000000123", "--config-dir", configDir})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "admin access is required to delete devices") {
+		t.Fatalf("error = %q, want admin access message", err.Error())
+	}
+}
