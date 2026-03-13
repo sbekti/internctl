@@ -254,7 +254,7 @@ func TestVlansListPrintsTable(t *testing.T) {
 	var stdout bytes.Buffer
 	cmd.SetOut(&stdout)
 	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{"vlans", "list", "--config-dir", configDir})
+	cmd.SetArgs([]string{"vlan", "list", "--config-dir", configDir})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -289,7 +289,7 @@ func TestDevicesListRequiresAdmin(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(new(bytes.Buffer))
 	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{"devices", "list", "--config-dir", configDir})
+	cmd.SetArgs([]string{"device", "list", "--config-dir", configDir})
 
 	err := cmd.Execute()
 	if err == nil {
@@ -320,7 +320,7 @@ func TestVlansListJSONOutput(t *testing.T) {
 	var stdout bytes.Buffer
 	cmd.SetOut(&stdout)
 	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{"vlans", "list", "--config-dir", configDir, "--output", "json"})
+	cmd.SetArgs([]string{"vlan", "list", "--config-dir", configDir, "--output", "json"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
@@ -356,7 +356,7 @@ func TestVlansCreatePrintsCreatedMessage(t *testing.T) {
 	cmd.SetOut(&stdout)
 	cmd.SetErr(new(bytes.Buffer))
 	cmd.SetArgs([]string{
-		"vlans", "create",
+		"vlan", "create",
 		"--config-dir", configDir,
 		"--name", "iot",
 		"--vlan-id", "20",
@@ -401,7 +401,7 @@ func TestVlansDeleteRequiresAdmin(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(new(bytes.Buffer))
 	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{"vlans", "delete", "42", "--config-dir", configDir})
+	cmd.SetArgs([]string{"vlan", "delete", "42", "--config-dir", configDir})
 
 	err := cmd.Execute()
 	if err == nil {
@@ -438,7 +438,7 @@ func TestDevicesCreatePrintsCreatedMessage(t *testing.T) {
 	cmd.SetOut(&stdout)
 	cmd.SetErr(new(bytes.Buffer))
 	cmd.SetArgs([]string{
-		"devices", "create",
+		"device", "create",
 		"--config-dir", configDir,
 		"--name", "Kitchen TV",
 		"--mac-address", "aa:bb:cc:dd:ee:ff",
@@ -476,7 +476,7 @@ func TestDevicesListPrintsIDAndSupportsJSONOutput(t *testing.T) {
 	var tableOut bytes.Buffer
 	tableCmd.SetOut(&tableOut)
 	tableCmd.SetErr(new(bytes.Buffer))
-	tableCmd.SetArgs([]string{"devices", "list", "--config-dir", configDir})
+	tableCmd.SetArgs([]string{"device", "list", "--config-dir", configDir})
 
 	if err := tableCmd.Execute(); err != nil {
 		t.Fatalf("table Execute returned error: %v", err)
@@ -489,50 +489,13 @@ func TestDevicesListPrintsIDAndSupportsJSONOutput(t *testing.T) {
 	var jsonOut bytes.Buffer
 	jsonCmd.SetOut(&jsonOut)
 	jsonCmd.SetErr(new(bytes.Buffer))
-	jsonCmd.SetArgs([]string{"devices", "list", "--config-dir", configDir, "--output", "json"})
+	jsonCmd.SetArgs([]string{"device", "list", "--config-dir", configDir, "--output", "json"})
 
 	if err := jsonCmd.Execute(); err != nil {
 		t.Fatalf("json Execute returned error: %v", err)
 	}
 	if !strings.Contains(jsonOut.String(), `"id": "00000000-0000-0000-0000-000000000123"`) || !strings.Contains(jsonOut.String(), `"display_name": "Kitchen TV"`) {
 		t.Fatalf("json output missing device fields: %s", jsonOut.String())
-	}
-}
-
-func TestSingularDeviceAndVlanCommandsWork(t *testing.T) {
-	t.Parallel()
-
-	configDir := t.TempDir()
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/api/v1/networks/vlans":
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"items":[]}`))
-		case "/api/v1/networks/devices":
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"items":[]}`))
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	defer server.Close()
-
-	writeLoggedInProfile(t, configDir, server.URL)
-
-	vlanCmd := NewRootCommand()
-	vlanCmd.SetOut(new(bytes.Buffer))
-	vlanCmd.SetErr(new(bytes.Buffer))
-	vlanCmd.SetArgs([]string{"vlan", "list", "--config-dir", configDir})
-	if err := vlanCmd.Execute(); err != nil {
-		t.Fatalf("vlan command returned error: %v", err)
-	}
-
-	deviceCmd := NewRootCommand()
-	deviceCmd.SetOut(new(bytes.Buffer))
-	deviceCmd.SetErr(new(bytes.Buffer))
-	deviceCmd.SetArgs([]string{"device", "list", "--config-dir", configDir})
-	if err := deviceCmd.Execute(); err != nil {
-		t.Fatalf("device command returned error: %v", err)
 	}
 }
 
@@ -556,7 +519,7 @@ func TestDevicesDeleteRequiresAdmin(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(new(bytes.Buffer))
 	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{"devices", "delete", "00000000-0000-0000-0000-000000000123", "--config-dir", configDir})
+	cmd.SetArgs([]string{"device", "delete", "00000000-0000-0000-0000-000000000123", "--config-dir", configDir})
 
 	err := cmd.Execute()
 	if err == nil {

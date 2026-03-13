@@ -39,8 +39,6 @@ func NewRootCommand() *cobra.Command {
 	cmd.AddCommand(newWhoamiCommand(options))
 	cmd.AddCommand(newVlanCommand(options))
 	cmd.AddCommand(newDeviceCommand(options))
-	cmd.AddCommand(newVlansCommand(options))
-	cmd.AddCommand(newDevicesCommand(options))
 
 	return cmd
 }
