@@ -300,6 +300,36 @@ func TestDevicesListRequiresAdmin(t *testing.T) {
 	}
 }
 
+func TestVlansListJSONOutput(t *testing.T) {
+	t.Parallel()
+
+	configDir := t.TempDir()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/networks/vlans" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"items":[{"id":1,"name":"guest","vlan_id":10,"description":"Guest devices","is_active":true,"created_at":"2026-03-13T00:00:00Z","updated_at":"2026-03-13T00:00:00Z"}]}`))
+	}))
+	defer server.Close()
+
+	writeLoggedInProfile(t, configDir, server.URL)
+
+	cmd := NewRootCommand()
+	var stdout bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetArgs([]string{"vlans", "list", "--config-dir", configDir, "--output", "json"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if !strings.Contains(stdout.String(), `"name": "guest"`) || !strings.Contains(stdout.String(), `"vlan_id": 10`) {
+		t.Fatalf("stdout missing JSON VLAN fields: %s", stdout.String())
+	}
+}
+
 func TestVlansCreatePrintsCreatedMessage(t *testing.T) {
 	t.Parallel()
 
@@ -423,6 +453,49 @@ func TestDevicesCreatePrintsCreatedMessage(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "Created device Kitchen TV (00000000-0000-0000-0000-000000000123).") {
 		t.Fatalf("stdout missing create confirmation: %s", stdout.String())
+	}
+}
+
+func TestDevicesListPrintsIDAndSupportsJSONOutput(t *testing.T) {
+	t.Parallel()
+
+	configDir := t.TempDir()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/networks/devices" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"items":[{"id":"00000000-0000-0000-0000-000000000123","display_name":"Kitchen TV","mac_address":"aa:bb:cc:dd:ee:ff","vlan":{"id":1,"name":"trusted","vlan_id":1},"created_at":"2026-03-13T00:00:00Z","updated_at":"2026-03-13T00:00:00Z"}]}`))
+	}))
+	defer server.Close()
+
+	writeLoggedInProfile(t, configDir, server.URL)
+
+	tableCmd := NewRootCommand()
+	var tableOut bytes.Buffer
+	tableCmd.SetOut(&tableOut)
+	tableCmd.SetErr(new(bytes.Buffer))
+	tableCmd.SetArgs([]string{"devices", "list", "--config-dir", configDir})
+
+	if err := tableCmd.Execute(); err != nil {
+		t.Fatalf("table Execute returned error: %v", err)
+	}
+	if !strings.Contains(tableOut.String(), "00000000-0000-0000-0000-000000000123") || !strings.Contains(tableOut.String(), "ID") {
+		t.Fatalf("table output missing device id: %s", tableOut.String())
+	}
+
+	jsonCmd := NewRootCommand()
+	var jsonOut bytes.Buffer
+	jsonCmd.SetOut(&jsonOut)
+	jsonCmd.SetErr(new(bytes.Buffer))
+	jsonCmd.SetArgs([]string{"devices", "list", "--config-dir", configDir, "--output", "json"})
+
+	if err := jsonCmd.Execute(); err != nil {
+		t.Fatalf("json Execute returned error: %v", err)
+	}
+	if !strings.Contains(jsonOut.String(), `"id": "00000000-0000-0000-0000-000000000123"`) || !strings.Contains(jsonOut.String(), `"display_name": "Kitchen TV"`) {
+		t.Fatalf("json output missing device fields: %s", jsonOut.String())
 	}
 }
 

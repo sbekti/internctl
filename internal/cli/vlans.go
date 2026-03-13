@@ -25,10 +25,16 @@ func newVlansCommand(options *RootOptions) *cobra.Command {
 }
 
 func newVlansListCommand(options *RootOptions) *cobra.Command {
-	return &cobra.Command{
+	var output string
+
+	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List VLANs",
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if err := validateOutputFormat(output); err != nil {
+				return err
+			}
+
 			runtime, err := resolveRuntime(options)
 			if err != nil {
 				return err
@@ -53,6 +59,10 @@ func newVlansListCommand(options *RootOptions) *cobra.Command {
 				return err
 			}
 
+			if output == "json" {
+				return printJSON(cmd, vlans)
+			}
+
 			rows := make([][]string, 0, len(vlans))
 			for _, vlan := range vlans {
 				rows = append(rows, []string{
@@ -70,6 +80,9 @@ func newVlansListCommand(options *RootOptions) *cobra.Command {
 			return nil
 		},
 	}
+
+	addOutputFlag(cmd, &output)
+	return cmd
 }
 
 func newVlansCreateCommand(options *RootOptions) *cobra.Command {

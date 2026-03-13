@@ -25,10 +25,16 @@ func newDevicesCommand(options *RootOptions) *cobra.Command {
 }
 
 func newDevicesListCommand(options *RootOptions) *cobra.Command {
-	return &cobra.Command{
+	var output string
+
+	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List network devices",
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if err := validateOutputFormat(output); err != nil {
+				return err
+			}
+
 			runtime, err := resolveRuntime(options)
 			if err != nil {
 				return err
@@ -53,21 +59,29 @@ func newDevicesListCommand(options *RootOptions) *cobra.Command {
 				return err
 			}
 
+			if output == "json" {
+				return printJSON(cmd, devices)
+			}
+
 			rows := make([][]string, 0, len(devices))
 			for _, device := range devices {
 				rows = append(rows, []string{
+					device.Id.String(),
 					device.DisplayName,
 					device.MacAddress,
 					device.Vlan.Name,
 				})
 			}
 
-			if err := printTable(cmd, []string{"NAME", "MAC ADDRESS", "VLAN"}, rows); err != nil {
+			if err := printTable(cmd, []string{"ID", "NAME", "MAC ADDRESS", "VLAN"}, rows); err != nil {
 				return fmt.Errorf("render device table: %w", err)
 			}
 			return nil
 		},
 	}
+
+	addOutputFlag(cmd, &output)
+	return cmd
 }
 
 func newDevicesCreateCommand(options *RootOptions) *cobra.Command {
