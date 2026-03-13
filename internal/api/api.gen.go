@@ -109,10 +109,12 @@ type Dashboard struct {
 
 // DeviceCode defines model for DeviceCode.
 type DeviceCode struct {
-	DeviceCode          string `json:"device_code"`
-	ExpiresInSeconds    int32  `json:"expires_in_seconds"`
-	PollIntervalSeconds int32  `json:"poll_interval_seconds"`
-	UserCode            string `json:"user_code"`
+	DeviceCode              string `json:"device_code"`
+	ExpiresIn               int32  `json:"expires_in"`
+	Interval                int32  `json:"interval"`
+	UserCode                string `json:"user_code"`
+	VerificationUri         string `json:"verification_uri"`
+	VerificationUriComplete string `json:"verification_uri_complete"`
 }
 
 // DeviceCodeCreateRequest defines model for DeviceCodeCreateRequest.

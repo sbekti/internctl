@@ -18,6 +18,7 @@ func TestLoginPersistsProfileAndSession(t *testing.T) {
 	t.Parallel()
 
 	configDir := t.TempDir()
+	profileName := "login-test"
 	var createRequest struct {
 		ClientName string `json:"client_name"`
 	}
@@ -30,7 +31,7 @@ func TestLoginPersistsProfileAndSession(t *testing.T) {
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"device_code":"device-code","user_code":"ABCD-EFGH","expires_in_seconds":60,"poll_interval_seconds":1}`))
+			_, _ = w.Write([]byte(`{"device_code":"device-code","user_code":"ABCD-EFGH","verification_uri":"https://intern.corp.example.com/auth/device","verification_uri_complete":"https://intern.corp.example.com/auth/device?user_code=ABCD-EFGH","expires_in":60,"interval":1}`))
 		case "/api/v1/auth/tokens":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"access_token":"access-token","token_type":"Bearer","expires_in_seconds":900,"refresh_token":"refresh-token"}`))
@@ -47,6 +48,7 @@ func TestLoginPersistsProfileAndSession(t *testing.T) {
 	cmd.SetErr(&stderr)
 	cmd.SetArgs([]string{
 		"login",
+		"--profile", profileName,
 		"--config-dir", configDir,
 		"--server", server.URL,
 		"--token-backend", "file",
@@ -63,7 +65,7 @@ func TestLoginPersistsProfileAndSession(t *testing.T) {
 	if !strings.Contains(stdout.String(), "Login successful.") {
 		t.Fatalf("stdout missing success message: %s", stdout.String())
 	}
-	if !strings.Contains(stdout.String(), "Verification URL: "+server.URL+"/auth/device?user_code=ABCD-EFGH") {
+	if !strings.Contains(stdout.String(), "Verification URL: https://intern.corp.example.com/auth/device?user_code=ABCD-EFGH") {
 		t.Fatalf("stdout missing derived verification URL: %s", stdout.String())
 	}
 	if stderr.Len() != 0 {
@@ -74,7 +76,7 @@ func TestLoginPersistsProfileAndSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load config returned error: %v", err)
 	}
-	profile := config.GetProfile(cfg, config.DefaultProfile)
+	profile := config.GetProfile(cfg, profileName)
 	if profile.ServerURL != server.URL {
 		t.Fatalf("server URL = %q, want %q", profile.ServerURL, server.URL)
 	}
@@ -83,7 +85,7 @@ func TestLoginPersistsProfileAndSession(t *testing.T) {
 	}
 
 	manager := session.NewManager(configDir)
-	data, actualBackend, err := manager.Load(config.DefaultProfile, session.BackendFile)
+	data, actualBackend, err := manager.Load(profileName, session.BackendFile)
 	if err != nil {
 		t.Fatalf("Load session returned error: %v", err)
 	}

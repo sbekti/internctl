@@ -1007,17 +1007,25 @@ components:
       required:
         - device_code
         - user_code
-        - expires_in_seconds
-        - poll_interval_seconds
+        - verification_uri
+        - verification_uri_complete
+        - expires_in
+        - interval
       properties:
         device_code:
           type: string
         user_code:
           type: string
-        expires_in_seconds:
+        verification_uri:
+          type: string
+          format: uri
+        verification_uri_complete:
+          type: string
+          format: uri
+        expires_in:
           type: integer
           format: int32
-        poll_interval_seconds:
+        interval:
           type: integer
           format: int32
     DeviceCodeTokenRequest:

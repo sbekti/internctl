@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -73,7 +72,10 @@ func newLoginCommand(options *RootOptions) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			verificationURL := authVerificationURL(resolvedServerURL, deviceCode.UserCode)
+			verificationURL := strings.TrimSpace(deviceCode.VerificationUriComplete)
+			if verificationURL == "" {
+				verificationURL = strings.TrimSpace(deviceCode.VerificationUri)
+			}
 
 			fmt.Fprintln(cmd.OutOrStdout(), "Open the verification URL in a browser and approve:")
 			fmt.Fprintf(cmd.OutOrStdout(), "Verification URL: %s\n", verificationURL)
@@ -81,15 +83,15 @@ func newLoginCommand(options *RootOptions) *cobra.Command {
 			fmt.Fprintf(
 				cmd.OutOrStdout(),
 				"Waiting for approval (will timeout in %ds)...\n",
-				deviceCode.ExpiresInSeconds,
+				deviceCode.ExpiresIn,
 			)
 
 			tokenResponse, err := waitForDeviceApproval(
 				cmd.Context(),
 				client,
 				deviceCode.DeviceCode,
-				time.Duration(deviceCode.PollIntervalSeconds)*time.Second,
-				time.Duration(deviceCode.ExpiresInSeconds)*time.Second,
+				time.Duration(deviceCode.Interval)*time.Second,
+				time.Duration(deviceCode.ExpiresIn)*time.Second,
 			)
 			if err != nil {
 				return err
@@ -204,22 +206,4 @@ func selectLoginBackend(cmd *cobra.Command, flagValue string, savedValue string)
 		return session.ParseBackend(savedValue)
 	}
 	return session.ParseBackend(flagValue)
-}
-
-func authVerificationURL(serverURL string, userCode string) string {
-	trimmedServerURL := strings.TrimSpace(serverURL)
-	trimmedUserCode := strings.TrimSpace(userCode)
-
-	parsed, err := url.Parse(trimmedServerURL)
-	if err != nil {
-		return strings.TrimRight(trimmedServerURL, "/") + "/auth/device?user_code=" + url.QueryEscape(trimmedUserCode)
-	}
-
-	parsed.Path = strings.TrimRight(parsed.Path, "/") + "/auth/device"
-	parsed.Fragment = ""
-	query := url.Values{}
-	query.Set("user_code", trimmedUserCode)
-	parsed.RawQuery = query.Encode()
-
-	return parsed.String()
 }
