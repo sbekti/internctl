@@ -138,7 +138,19 @@ func waitForDeviceApproval(
 	pollInterval time.Duration,
 	timeout time.Duration,
 ) (*api.TokenResponse, error) {
+	return waitForDeviceApprovalWithSleeper(ctx, client, deviceCode, pollInterval, timeout, sleepContext)
+}
+
+func waitForDeviceApprovalWithSleeper(
+	ctx context.Context,
+	client *httpclient.Client,
+	deviceCode string,
+	pollInterval time.Duration,
+	timeout time.Duration,
+	sleep func(context.Context, time.Duration) error,
+) (*api.TokenResponse, error) {
 	deadline := time.Now().Add(timeout)
+	currentInterval := pollInterval
 
 	for {
 		if time.Now().After(deadline) {
@@ -154,7 +166,13 @@ func waitForDeviceApproval(
 		if errors.As(err, &authErr) {
 			switch authErr.Code {
 			case "authorization_pending":
-				if err := sleepContext(ctx, pollInterval); err != nil {
+				if err := sleep(ctx, currentInterval); err != nil {
+					return nil, err
+				}
+				continue
+			case "slow_down":
+				currentInterval = nextSlowDownInterval(currentInterval)
+				if err := sleep(ctx, currentInterval); err != nil {
 					return nil, err
 				}
 				continue
@@ -169,16 +187,15 @@ func waitForDeviceApproval(
 			}
 		}
 
-		var apiErr httpclient.APIError
-		if errors.As(err, &apiErr) && apiErr.StatusCode == 429 {
-			if err := sleepContext(ctx, pollInterval); err != nil {
-				return nil, err
-			}
-			continue
-		}
-
 		return nil, err
 	}
+}
+
+func nextSlowDownInterval(current time.Duration) time.Duration {
+	if current <= 0 {
+		current = time.Second
+	}
+	return current + 5*time.Second
 }
 
 func sleepContext(ctx context.Context, delay time.Duration) error {

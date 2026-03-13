@@ -138,12 +138,6 @@ func (c *Client) ExchangeDeviceCode(ctx context.Context, deviceCode string) (*ap
 			Description: resp.JSON428.ErrorDescription,
 			StatusCode:  resp.StatusCode(),
 		}
-	case http.StatusTooManyRequests:
-		return nil, APIError{
-			StatusCode: resp.StatusCode(),
-			Code:       resp.JSON429.Code,
-			Message:    resp.JSON429.Message,
-		}
 	default:
 		return nil, unexpectedStatus("exchange device code", resp.StatusCode(), resp.Body)
 	}

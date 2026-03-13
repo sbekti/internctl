@@ -85,9 +85,17 @@ type AuthSession struct {
 	Username      string             `json:"username"`
 }
 
-// AuthSessionList defines model for AuthSessionList.
-type AuthSessionList struct {
-	Items []AuthSession `json:"items"`
+// AuthSessionPage defines model for AuthSessionPage.
+type AuthSessionPage struct {
+	Items      []AuthSession         `json:"items"`
+	Pagination AuthSessionPagination `json:"pagination"`
+}
+
+// AuthSessionPagination defines model for AuthSessionPagination.
+type AuthSessionPagination struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+	Total  int64 `json:"total"`
 }
 
 // ClientAuthError defines model for ClientAuthError.
@@ -302,6 +310,18 @@ type ListAdminAuditLogsParams struct {
 	Offset        *int32  `form:"offset,omitempty" json:"offset,omitempty"`
 }
 
+// ListAdminAuthSessionsParams defines parameters for ListAdminAuthSessions.
+type ListAdminAuthSessionsParams struct {
+	Limit  *int32 `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset *int32 `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
+// ListProfileSessionsParams defines parameters for ListProfileSessions.
+type ListProfileSessionsParams struct {
+	Limit  *int32 `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset *int32 `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
 // CreateDeviceCodeJSONRequestBody defines body for CreateDeviceCode for application/json ContentType.
 type CreateDeviceCodeJSONRequestBody = DeviceCodeCreateRequest
 
@@ -406,7 +426,10 @@ type ClientInterface interface {
 	ListAdminAuditLogs(ctx context.Context, params *ListAdminAuditLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListAdminAuthSessions request
-	ListAdminAuthSessions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ListAdminAuthSessions(ctx context.Context, params *ListAdminAuthSessionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeAllAdminAuthSessions request
+	RevokeAllAdminAuthSessions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RevokeAdminAuthSession request
 	RevokeAdminAuthSession(ctx context.Context, id SessionId, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -487,7 +510,7 @@ type ClientInterface interface {
 	PatchProfilePreferences(ctx context.Context, body PatchProfilePreferencesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListProfileSessions request
-	ListProfileSessions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ListProfileSessions(ctx context.Context, params *ListProfileSessionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RevokeOtherProfileSessions request
 	RevokeOtherProfileSessions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -508,8 +531,20 @@ func (c *Client) ListAdminAuditLogs(ctx context.Context, params *ListAdminAuditL
 	return c.Client.Do(req)
 }
 
-func (c *Client) ListAdminAuthSessions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListAdminAuthSessionsRequest(c.Server)
+func (c *Client) ListAdminAuthSessions(ctx context.Context, params *ListAdminAuthSessionsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAdminAuthSessionsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) RevokeAllAdminAuthSessions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRevokeAllAdminAuthSessionsRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -868,8 +903,8 @@ func (c *Client) PatchProfilePreferences(ctx context.Context, body PatchProfileP
 	return c.Client.Do(req)
 }
 
-func (c *Client) ListProfileSessions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListProfileSessionsRequest(c.Server)
+func (c *Client) ListProfileSessions(ctx context.Context, params *ListProfileSessionsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListProfileSessionsRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -1034,7 +1069,7 @@ func NewListAdminAuditLogsRequest(server string, params *ListAdminAuditLogsParam
 }
 
 // NewListAdminAuthSessionsRequest generates requests for ListAdminAuthSessions
-func NewListAdminAuthSessionsRequest(server string) (*http.Request, error) {
+func NewListAdminAuthSessionsRequest(server string, params *ListAdminAuthSessionsParams) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -1052,7 +1087,72 @@ func NewListAdminAuthSessionsRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: "int32"}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "offset", *params.Offset, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: "int32"}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewRevokeAllAdminAuthSessionsRequest generates requests for RevokeAllAdminAuthSessions
+func NewRevokeAllAdminAuthSessionsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/auth/sessions/revoke_all")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1781,7 +1881,7 @@ func NewPatchProfilePreferencesRequestWithBody(server string, contentType string
 }
 
 // NewListProfileSessionsRequest generates requests for ListProfileSessions
-func NewListProfileSessionsRequest(server string) (*http.Request, error) {
+func NewListProfileSessionsRequest(server string, params *ListProfileSessionsParams) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -1797,6 +1897,44 @@ func NewListProfileSessionsRequest(server string) (*http.Request, error) {
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: "int32"}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "offset", *params.Offset, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: "int32"}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
 	}
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
@@ -1915,7 +2053,10 @@ type ClientWithResponsesInterface interface {
 	ListAdminAuditLogsWithResponse(ctx context.Context, params *ListAdminAuditLogsParams, reqEditors ...RequestEditorFn) (*ListAdminAuditLogsResponse, error)
 
 	// ListAdminAuthSessionsWithResponse request
-	ListAdminAuthSessionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListAdminAuthSessionsResponse, error)
+	ListAdminAuthSessionsWithResponse(ctx context.Context, params *ListAdminAuthSessionsParams, reqEditors ...RequestEditorFn) (*ListAdminAuthSessionsResponse, error)
+
+	// RevokeAllAdminAuthSessionsWithResponse request
+	RevokeAllAdminAuthSessionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*RevokeAllAdminAuthSessionsResponse, error)
 
 	// RevokeAdminAuthSessionWithResponse request
 	RevokeAdminAuthSessionWithResponse(ctx context.Context, id SessionId, reqEditors ...RequestEditorFn) (*RevokeAdminAuthSessionResponse, error)
@@ -1996,7 +2137,7 @@ type ClientWithResponsesInterface interface {
 	PatchProfilePreferencesWithResponse(ctx context.Context, body PatchProfilePreferencesJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchProfilePreferencesResponse, error)
 
 	// ListProfileSessionsWithResponse request
-	ListProfileSessionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListProfileSessionsResponse, error)
+	ListProfileSessionsWithResponse(ctx context.Context, params *ListProfileSessionsParams, reqEditors ...RequestEditorFn) (*ListProfileSessionsResponse, error)
 
 	// RevokeOtherProfileSessionsWithResponse request
 	RevokeOtherProfileSessionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*RevokeOtherProfileSessionsResponse, error)
@@ -2033,7 +2174,7 @@ func (r ListAdminAuditLogsResponse) StatusCode() int {
 type ListAdminAuthSessionsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *AuthSessionList
+	JSON200      *AuthSessionPage
 	JSON401      *Unauthorized
 	JSON403      *Forbidden
 }
@@ -2048,6 +2189,29 @@ func (r ListAdminAuthSessionsResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r ListAdminAuthSessionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type RevokeAllAdminAuthSessionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON401      *Unauthorized
+	JSON403      *Forbidden
+}
+
+// Status returns HTTPResponse.Status
+func (r RevokeAllAdminAuthSessionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RevokeAllAdminAuthSessionsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -2179,7 +2343,6 @@ type ExchangeDeviceCodeResponse struct {
 	JSON200      *TokenResponse
 	JSON400      *ClientAuthError
 	JSON428      *ClientAuthError
-	JSON429      *TooManyRequests
 }
 
 // Status returns HTTPResponse.Status
@@ -2378,6 +2541,7 @@ type ListVlansResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *VlanList
 	JSON401      *Unauthorized
+	JSON403      *Forbidden
 }
 
 // Status returns HTTPResponse.Status
@@ -2453,6 +2617,7 @@ type GetVlanResponse struct {
 	JSON200      *Vlan
 	JSON400      *BadRequest
 	JSON401      *Unauthorized
+	JSON403      *Forbidden
 	JSON404      *NotFound
 }
 
@@ -2549,7 +2714,7 @@ func (r PatchProfilePreferencesResponse) StatusCode() int {
 type ListProfileSessionsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *AuthSessionList
+	JSON200      *AuthSessionPage
 	JSON401      *Unauthorized
 }
 
@@ -2624,12 +2789,21 @@ func (c *ClientWithResponses) ListAdminAuditLogsWithResponse(ctx context.Context
 }
 
 // ListAdminAuthSessionsWithResponse request returning *ListAdminAuthSessionsResponse
-func (c *ClientWithResponses) ListAdminAuthSessionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListAdminAuthSessionsResponse, error) {
-	rsp, err := c.ListAdminAuthSessions(ctx, reqEditors...)
+func (c *ClientWithResponses) ListAdminAuthSessionsWithResponse(ctx context.Context, params *ListAdminAuthSessionsParams, reqEditors ...RequestEditorFn) (*ListAdminAuthSessionsResponse, error) {
+	rsp, err := c.ListAdminAuthSessions(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
 	return ParseListAdminAuthSessionsResponse(rsp)
+}
+
+// RevokeAllAdminAuthSessionsWithResponse request returning *RevokeAllAdminAuthSessionsResponse
+func (c *ClientWithResponses) RevokeAllAdminAuthSessionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*RevokeAllAdminAuthSessionsResponse, error) {
+	rsp, err := c.RevokeAllAdminAuthSessions(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRevokeAllAdminAuthSessionsResponse(rsp)
 }
 
 // RevokeAdminAuthSessionWithResponse request returning *RevokeAdminAuthSessionResponse
@@ -2885,8 +3059,8 @@ func (c *ClientWithResponses) PatchProfilePreferencesWithResponse(ctx context.Co
 }
 
 // ListProfileSessionsWithResponse request returning *ListProfileSessionsResponse
-func (c *ClientWithResponses) ListProfileSessionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListProfileSessionsResponse, error) {
-	rsp, err := c.ListProfileSessions(ctx, reqEditors...)
+func (c *ClientWithResponses) ListProfileSessionsWithResponse(ctx context.Context, params *ListProfileSessionsParams, reqEditors ...RequestEditorFn) (*ListProfileSessionsResponse, error) {
+	rsp, err := c.ListProfileSessions(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -2973,12 +3147,45 @@ func ParseListAdminAuthSessionsResponse(rsp *http.Response) (*ListAdminAuthSessi
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest AuthSessionList
+		var dest AuthSessionPage
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRevokeAllAdminAuthSessionsResponse parses an HTTP response from a RevokeAllAdminAuthSessionsWithResponse call
+func ParseRevokeAllAdminAuthSessionsResponse(rsp *http.Response) (*RevokeAllAdminAuthSessionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RevokeAllAdminAuthSessionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Unauthorized
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -3225,13 +3432,6 @@ func ParseExchangeDeviceCodeResponse(rsp *http.Response) (*ExchangeDeviceCodeRes
 			return nil, err
 		}
 		response.JSON428 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
-		var dest TooManyRequests
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON429 = &dest
 
 	}
 
@@ -3595,6 +3795,13 @@ func ParseListVlansResponse(rsp *http.Response) (*ListVlansResponse, error) {
 		}
 		response.JSON401 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	}
 
 	return response, nil
@@ -3735,6 +3942,13 @@ func ParseGetVlanResponse(rsp *http.Response) (*GetVlanResponse, error) {
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
@@ -3897,7 +4111,7 @@ func ParseListProfileSessionsResponse(rsp *http.Response) (*ListProfileSessionsR
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest AuthSessionList
+		var dest AuthSessionPage
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
