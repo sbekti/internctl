@@ -24,7 +24,7 @@ internctl session list
 internctl session list --all --page 2 --page-size 20 --output json
 internctl vlan list
 internctl device list --output json
-internctl vlan create --name iot --vlan-id 20 --description "IoT devices" --active
+internctl vlan create --name iot --vlan-id 20 --description "IoT devices"
 internctl device create --name "Kitchen TV" --mac-address aa:bb:cc:dd:ee:ff --vlan-id 1
 internctl logout
 ```

@@ -237,8 +237,8 @@ func (c *Client) CreateVlan(ctx context.Context, body api.VlanWrite) (*api.Vlan,
 	}
 }
 
-func (c *Client) UpdateVlan(ctx context.Context, id int64, body api.VlanPatch) (*api.Vlan, error) {
-	resp, err := c.authenticated.PatchVlanWithResponse(ctx, api.VlanId(id), body)
+func (c *Client) UpdateVlan(ctx context.Context, vlanID int32, body api.VlanPatch) (*api.Vlan, error) {
+	resp, err := c.authenticated.PatchVlanWithResponse(ctx, api.VlanId(vlanID), body)
 	if err != nil {
 		return nil, err
 	}
@@ -264,8 +264,8 @@ func (c *Client) UpdateVlan(ctx context.Context, id int64, body api.VlanPatch) (
 	}
 }
 
-func (c *Client) DeleteVlan(ctx context.Context, id int64) error {
-	resp, err := c.authenticated.DeleteVlanWithResponse(ctx, api.VlanId(id))
+func (c *Client) DeleteVlan(ctx context.Context, vlanID int32) error {
+	resp, err := c.authenticated.DeleteVlanWithResponse(ctx, api.VlanId(vlanID))
 	if err != nil {
 		return err
 	}

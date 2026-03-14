@@ -87,7 +87,7 @@ func newDevicesListCommand(options *RootOptions) *cobra.Command {
 func newDevicesCreateCommand(options *RootOptions) *cobra.Command {
 	var name string
 	var macAddress string
-	var vlanID int64
+	var vlanID int32
 
 	cmd := &cobra.Command{
 		Use:   "create",
@@ -129,7 +129,7 @@ func newDevicesCreateCommand(options *RootOptions) *cobra.Command {
 
 	cmd.Flags().StringVar(&name, "name", "", "Device display name")
 	cmd.Flags().StringVar(&macAddress, "mac-address", "", "Device MAC address")
-	cmd.Flags().Int64Var(&vlanID, "vlan-id", 0, "Assigned VLAN record ID")
+	cmd.Flags().Int32Var(&vlanID, "vlan-id", 0, "Assigned network VLAN ID")
 
 	return cmd
 }
@@ -137,7 +137,7 @@ func newDevicesCreateCommand(options *RootOptions) *cobra.Command {
 func newDevicesUpdateCommand(options *RootOptions) *cobra.Command {
 	var name string
 	var macAddress string
-	var vlanID int64
+	var vlanID int32
 
 	cmd := &cobra.Command{
 		Use:   "update <id>",
@@ -191,7 +191,7 @@ func newDevicesUpdateCommand(options *RootOptions) *cobra.Command {
 
 	cmd.Flags().StringVar(&name, "name", "", "Device display name")
 	cmd.Flags().StringVar(&macAddress, "mac-address", "", "Device MAC address")
-	cmd.Flags().Int64Var(&vlanID, "vlan-id", 0, "Assigned VLAN record ID")
+	cmd.Flags().Int32Var(&vlanID, "vlan-id", 0, "Assigned network VLAN ID")
 
 	return cmd
 }

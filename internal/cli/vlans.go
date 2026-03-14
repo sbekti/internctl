@@ -66,15 +66,13 @@ func newVlansListCommand(options *RootOptions) *cobra.Command {
 			rows := make([][]string, 0, len(vlans))
 			for _, vlan := range vlans {
 				rows = append(rows, []string{
-					strconv.FormatInt(vlan.Id, 10),
-					vlan.Name,
 					strconv.FormatInt(int64(vlan.VlanId), 10),
+					vlan.Name,
 					vlan.Description,
-					boolLabel(vlan.IsActive),
 				})
 			}
 
-			if err := printTable(cmd, []string{"ID", "NAME", "VLAN ID", "DESCRIPTION", "ACTIVE"}, rows); err != nil {
+			if err := printTable(cmd, []string{"VLAN ID", "NAME", "DESCRIPTION"}, rows); err != nil {
 				return fmt.Errorf("render VLAN table: %w", err)
 			}
 			return nil
@@ -89,16 +87,11 @@ func newVlansCreateCommand(options *RootOptions) *cobra.Command {
 	var name string
 	var vlanID int32
 	var description string
-	var active bool
-	var inactive bool
 
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a VLAN",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if active && inactive {
-				return errors.New("use only one of --active or --inactive")
-			}
 			if name == "" {
 				return errors.New("--name is required")
 			}
@@ -123,17 +116,13 @@ func newVlansCreateCommand(options *RootOptions) *cobra.Command {
 			if cmd.Flags().Changed("description") {
 				body.Description = &description
 			}
-			if active || inactive {
-				isActive := active && !inactive
-				body.IsActive = &isActive
-			}
 
 			vlan, err := client.CreateVlan(cmd.Context(), body)
 			if err != nil {
 				return mapVlanMutationError(err, "create")
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "Created VLAN %d (%s).\n", vlan.Id, vlan.Name)
+			fmt.Fprintf(cmd.OutOrStdout(), "Created VLAN %d (%s).\n", vlan.VlanId, vlan.Name)
 			return nil
 		},
 	}
@@ -141,8 +130,6 @@ func newVlansCreateCommand(options *RootOptions) *cobra.Command {
 	cmd.Flags().StringVar(&name, "name", "", "VLAN display name")
 	cmd.Flags().Int32Var(&vlanID, "vlan-id", 0, "Network VLAN ID")
 	cmd.Flags().StringVar(&description, "description", "", "VLAN description")
-	cmd.Flags().BoolVar(&active, "active", false, "Mark the VLAN as active")
-	cmd.Flags().BoolVar(&inactive, "inactive", false, "Mark the VLAN as inactive")
 
 	return cmd
 }
@@ -151,21 +138,15 @@ func newVlansUpdateCommand(options *RootOptions) *cobra.Command {
 	var name string
 	var vlanID int32
 	var description string
-	var active bool
-	var inactive bool
 
 	cmd := &cobra.Command{
-		Use:   "update <id>",
+		Use:   "update <vlan-id>",
 		Short: "Update a VLAN",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if active && inactive {
-				return errors.New("use only one of --active or --inactive")
-			}
-
-			id, err := strconv.ParseInt(args[0], 10, 64)
-			if err != nil || id <= 0 {
-				return errors.New("VLAN id must be a positive integer")
+			currentVlanID, err := strconv.ParseInt(args[0], 10, 32)
+			if err != nil || currentVlanID <= 0 {
+				return errors.New("vlan id must be a positive integer")
 			}
 
 			patch := api.VlanPatch{}
@@ -185,11 +166,6 @@ func newVlansUpdateCommand(options *RootOptions) *cobra.Command {
 				patch.Description = &description
 				changed = true
 			}
-			if active || inactive {
-				isActive := active && !inactive
-				patch.IsActive = &isActive
-				changed = true
-			}
 			if !changed {
 				return errors.New("no changes requested")
 			}
@@ -204,12 +180,12 @@ func newVlansUpdateCommand(options *RootOptions) *cobra.Command {
 				return err
 			}
 
-			vlan, err := client.UpdateVlan(cmd.Context(), id, patch)
+			vlan, err := client.UpdateVlan(cmd.Context(), int32(currentVlanID), patch)
 			if err != nil {
 				return mapVlanMutationError(err, "update")
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "Updated VLAN %d (%s).\n", vlan.Id, vlan.Name)
+			fmt.Fprintf(cmd.OutOrStdout(), "Updated VLAN %d (%s).\n", vlan.VlanId, vlan.Name)
 			return nil
 		},
 	}
@@ -217,21 +193,19 @@ func newVlansUpdateCommand(options *RootOptions) *cobra.Command {
 	cmd.Flags().StringVar(&name, "name", "", "VLAN display name")
 	cmd.Flags().Int32Var(&vlanID, "vlan-id", 0, "Network VLAN ID")
 	cmd.Flags().StringVar(&description, "description", "", "VLAN description")
-	cmd.Flags().BoolVar(&active, "active", false, "Mark the VLAN as active")
-	cmd.Flags().BoolVar(&inactive, "inactive", false, "Mark the VLAN as inactive")
 
 	return cmd
 }
 
 func newVlansDeleteCommand(options *RootOptions) *cobra.Command {
 	return &cobra.Command{
-		Use:   "delete <id>",
+		Use:   "delete <vlan-id>",
 		Short: "Delete a VLAN",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			id, err := strconv.ParseInt(args[0], 10, 64)
-			if err != nil || id <= 0 {
-				return errors.New("VLAN id must be a positive integer")
+			vlanID, err := strconv.ParseInt(args[0], 10, 32)
+			if err != nil || vlanID <= 0 {
+				return errors.New("vlan id must be a positive integer")
 			}
 
 			runtime, err := resolveRuntime(options)
@@ -244,11 +218,11 @@ func newVlansDeleteCommand(options *RootOptions) *cobra.Command {
 				return err
 			}
 
-			if err := client.DeleteVlan(cmd.Context(), id); err != nil {
+			if err := client.DeleteVlan(cmd.Context(), int32(vlanID)); err != nil {
 				return mapVlanMutationError(err, "delete")
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "Deleted VLAN %d.\n", id)
+			fmt.Fprintf(cmd.OutOrStdout(), "Deleted VLAN %d.\n", vlanID)
 			return nil
 		},
 	}

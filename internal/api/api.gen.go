@@ -167,14 +167,14 @@ type NetworkDeviceList struct {
 type NetworkDevicePatch struct {
 	DisplayName *string `json:"display_name,omitempty"`
 	MacAddress  *string `json:"mac_address,omitempty"`
-	VlanId      *int64  `json:"vlan_id,omitempty"`
+	VlanId      *int32  `json:"vlan_id,omitempty"`
 }
 
 // NetworkDeviceWrite defines model for NetworkDeviceWrite.
 type NetworkDeviceWrite struct {
 	DisplayName string `json:"display_name"`
 	MacAddress  string `json:"mac_address"`
-	VlanId      int64  `json:"vlan_id"`
+	VlanId      int32  `json:"vlan_id"`
 }
 
 // NetworkSummary defines model for NetworkSummary.
@@ -221,8 +221,6 @@ type TokenResponse struct {
 type Vlan struct {
 	CreatedAt   time.Time `json:"created_at"`
 	Description string    `json:"description"`
-	Id          int64     `json:"id"`
-	IsActive    bool      `json:"is_active"`
 	Name        string    `json:"name"`
 	UpdatedAt   time.Time `json:"updated_at"`
 	VlanId      int32     `json:"vlan_id"`
@@ -236,14 +234,12 @@ type VlanList struct {
 // VlanPatch defines model for VlanPatch.
 type VlanPatch struct {
 	Description *string `json:"description,omitempty"`
-	IsActive    *bool   `json:"is_active,omitempty"`
 	Name        *string `json:"name,omitempty"`
 	VlanId      *int32  `json:"vlan_id,omitempty"`
 }
 
 // VlanRef defines model for VlanRef.
 type VlanRef struct {
-	Id     int64  `json:"id"`
 	Name   string `json:"name"`
 	VlanId int32  `json:"vlan_id"`
 }
@@ -251,7 +247,6 @@ type VlanRef struct {
 // VlanWrite defines model for VlanWrite.
 type VlanWrite struct {
 	Description *string `json:"description,omitempty"`
-	IsActive    *bool   `json:"is_active,omitempty"`
 	Name        string  `json:"name"`
 	VlanId      int32   `json:"vlan_id"`
 }
@@ -280,7 +275,7 @@ type SessionId = openapi_types.UUID
 type UserCode = string
 
 // VlanId defines model for VlanId.
-type VlanId = int64
+type VlanId = int32
 
 // BadRequest defines model for BadRequest.
 type BadRequest = ErrorResponse
@@ -491,15 +486,15 @@ type ClientInterface interface {
 	CreateVlan(ctx context.Context, body CreateVlanJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteVlan request
-	DeleteVlan(ctx context.Context, id VlanId, reqEditors ...RequestEditorFn) (*http.Response, error)
+	DeleteVlan(ctx context.Context, vlanId VlanId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetVlan request
-	GetVlan(ctx context.Context, id VlanId, reqEditors ...RequestEditorFn) (*http.Response, error)
+	GetVlan(ctx context.Context, vlanId VlanId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// PatchVlanWithBody request with any body
-	PatchVlanWithBody(ctx context.Context, id VlanId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	PatchVlanWithBody(ctx context.Context, vlanId VlanId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PatchVlan(ctx context.Context, id VlanId, body PatchVlanJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	PatchVlan(ctx context.Context, vlanId VlanId, body PatchVlanJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetProfile request
 	GetProfile(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -819,8 +814,8 @@ func (c *Client) CreateVlan(ctx context.Context, body CreateVlanJSONRequestBody,
 	return c.Client.Do(req)
 }
 
-func (c *Client) DeleteVlan(ctx context.Context, id VlanId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteVlanRequest(c.Server, id)
+func (c *Client) DeleteVlan(ctx context.Context, vlanId VlanId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteVlanRequest(c.Server, vlanId)
 	if err != nil {
 		return nil, err
 	}
@@ -831,8 +826,8 @@ func (c *Client) DeleteVlan(ctx context.Context, id VlanId, reqEditors ...Reques
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetVlan(ctx context.Context, id VlanId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetVlanRequest(c.Server, id)
+func (c *Client) GetVlan(ctx context.Context, vlanId VlanId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetVlanRequest(c.Server, vlanId)
 	if err != nil {
 		return nil, err
 	}
@@ -843,8 +838,8 @@ func (c *Client) GetVlan(ctx context.Context, id VlanId, reqEditors ...RequestEd
 	return c.Client.Do(req)
 }
 
-func (c *Client) PatchVlanWithBody(ctx context.Context, id VlanId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPatchVlanRequestWithBody(c.Server, id, contentType, body)
+func (c *Client) PatchVlanWithBody(ctx context.Context, vlanId VlanId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchVlanRequestWithBody(c.Server, vlanId, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -855,8 +850,8 @@ func (c *Client) PatchVlanWithBody(ctx context.Context, id VlanId, contentType s
 	return c.Client.Do(req)
 }
 
-func (c *Client) PatchVlan(ctx context.Context, id VlanId, body PatchVlanJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPatchVlanRequest(c.Server, id, body)
+func (c *Client) PatchVlan(ctx context.Context, vlanId VlanId, body PatchVlanJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchVlanRequest(c.Server, vlanId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1699,12 +1694,12 @@ func NewCreateVlanRequestWithBody(server string, contentType string, body io.Rea
 }
 
 // NewDeleteVlanRequest generates requests for DeleteVlan
-func NewDeleteVlanRequest(server string, id VlanId) (*http.Request, error) {
+func NewDeleteVlanRequest(server string, vlanId VlanId) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
 
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: "int64"})
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "vlan_id", vlanId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: "int32"})
 	if err != nil {
 		return nil, err
 	}
@@ -1733,12 +1728,12 @@ func NewDeleteVlanRequest(server string, id VlanId) (*http.Request, error) {
 }
 
 // NewGetVlanRequest generates requests for GetVlan
-func NewGetVlanRequest(server string, id VlanId) (*http.Request, error) {
+func NewGetVlanRequest(server string, vlanId VlanId) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
 
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: "int64"})
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "vlan_id", vlanId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: "int32"})
 	if err != nil {
 		return nil, err
 	}
@@ -1767,23 +1762,23 @@ func NewGetVlanRequest(server string, id VlanId) (*http.Request, error) {
 }
 
 // NewPatchVlanRequest calls the generic PatchVlan builder with application/json body
-func NewPatchVlanRequest(server string, id VlanId, body PatchVlanJSONRequestBody) (*http.Request, error) {
+func NewPatchVlanRequest(server string, vlanId VlanId, body PatchVlanJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewPatchVlanRequestWithBody(server, id, "application/json", bodyReader)
+	return NewPatchVlanRequestWithBody(server, vlanId, "application/json", bodyReader)
 }
 
 // NewPatchVlanRequestWithBody generates requests for PatchVlan with any type of body
-func NewPatchVlanRequestWithBody(server string, id VlanId, contentType string, body io.Reader) (*http.Request, error) {
+func NewPatchVlanRequestWithBody(server string, vlanId VlanId, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
 
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: "int64"})
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "vlan_id", vlanId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: "int32"})
 	if err != nil {
 		return nil, err
 	}
@@ -2118,15 +2113,15 @@ type ClientWithResponsesInterface interface {
 	CreateVlanWithResponse(ctx context.Context, body CreateVlanJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateVlanResponse, error)
 
 	// DeleteVlanWithResponse request
-	DeleteVlanWithResponse(ctx context.Context, id VlanId, reqEditors ...RequestEditorFn) (*DeleteVlanResponse, error)
+	DeleteVlanWithResponse(ctx context.Context, vlanId VlanId, reqEditors ...RequestEditorFn) (*DeleteVlanResponse, error)
 
 	// GetVlanWithResponse request
-	GetVlanWithResponse(ctx context.Context, id VlanId, reqEditors ...RequestEditorFn) (*GetVlanResponse, error)
+	GetVlanWithResponse(ctx context.Context, vlanId VlanId, reqEditors ...RequestEditorFn) (*GetVlanResponse, error)
 
 	// PatchVlanWithBodyWithResponse request with any body
-	PatchVlanWithBodyWithResponse(ctx context.Context, id VlanId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchVlanResponse, error)
+	PatchVlanWithBodyWithResponse(ctx context.Context, vlanId VlanId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchVlanResponse, error)
 
-	PatchVlanWithResponse(ctx context.Context, id VlanId, body PatchVlanJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchVlanResponse, error)
+	PatchVlanWithResponse(ctx context.Context, vlanId VlanId, body PatchVlanJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchVlanResponse, error)
 
 	// GetProfileWithResponse request
 	GetProfileWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetProfileResponse, error)
@@ -3002,8 +2997,8 @@ func (c *ClientWithResponses) CreateVlanWithResponse(ctx context.Context, body C
 }
 
 // DeleteVlanWithResponse request returning *DeleteVlanResponse
-func (c *ClientWithResponses) DeleteVlanWithResponse(ctx context.Context, id VlanId, reqEditors ...RequestEditorFn) (*DeleteVlanResponse, error) {
-	rsp, err := c.DeleteVlan(ctx, id, reqEditors...)
+func (c *ClientWithResponses) DeleteVlanWithResponse(ctx context.Context, vlanId VlanId, reqEditors ...RequestEditorFn) (*DeleteVlanResponse, error) {
+	rsp, err := c.DeleteVlan(ctx, vlanId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -3011,8 +3006,8 @@ func (c *ClientWithResponses) DeleteVlanWithResponse(ctx context.Context, id Vla
 }
 
 // GetVlanWithResponse request returning *GetVlanResponse
-func (c *ClientWithResponses) GetVlanWithResponse(ctx context.Context, id VlanId, reqEditors ...RequestEditorFn) (*GetVlanResponse, error) {
-	rsp, err := c.GetVlan(ctx, id, reqEditors...)
+func (c *ClientWithResponses) GetVlanWithResponse(ctx context.Context, vlanId VlanId, reqEditors ...RequestEditorFn) (*GetVlanResponse, error) {
+	rsp, err := c.GetVlan(ctx, vlanId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -3020,16 +3015,16 @@ func (c *ClientWithResponses) GetVlanWithResponse(ctx context.Context, id VlanId
 }
 
 // PatchVlanWithBodyWithResponse request with arbitrary body returning *PatchVlanResponse
-func (c *ClientWithResponses) PatchVlanWithBodyWithResponse(ctx context.Context, id VlanId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchVlanResponse, error) {
-	rsp, err := c.PatchVlanWithBody(ctx, id, contentType, body, reqEditors...)
+func (c *ClientWithResponses) PatchVlanWithBodyWithResponse(ctx context.Context, vlanId VlanId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchVlanResponse, error) {
+	rsp, err := c.PatchVlanWithBody(ctx, vlanId, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
 	return ParsePatchVlanResponse(rsp)
 }
 
-func (c *ClientWithResponses) PatchVlanWithResponse(ctx context.Context, id VlanId, body PatchVlanJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchVlanResponse, error) {
-	rsp, err := c.PatchVlan(ctx, id, body, reqEditors...)
+func (c *ClientWithResponses) PatchVlanWithResponse(ctx context.Context, vlanId VlanId, body PatchVlanJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchVlanResponse, error) {
+	rsp, err := c.PatchVlan(ctx, vlanId, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}

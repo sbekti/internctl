@@ -249,7 +249,7 @@ func TestVlansListPrintsTable(t *testing.T) {
 			t.Fatalf("Authorization header = %q, want %q", got, "Bearer access-token")
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"items":[{"id":1,"name":"guest","vlan_id":10,"description":"Guest devices","is_active":true,"created_at":"2026-03-13T00:00:00Z","updated_at":"2026-03-13T00:00:00Z"}]}`))
+		_, _ = w.Write([]byte(`{"items":[{"name":"guest","vlan_id":10,"description":"Guest devices","created_at":"2026-03-13T00:00:00Z","updated_at":"2026-03-13T00:00:00Z"}]}`))
 	}))
 	defer server.Close()
 
@@ -266,10 +266,10 @@ func TestVlansListPrintsTable(t *testing.T) {
 	}
 
 	output := stdout.String()
-	if !strings.Contains(output, "ID") || !strings.Contains(output, "VLAN ID") || !strings.Contains(output, "ACTIVE") {
+	if !strings.Contains(output, "VLAN ID") || !strings.Contains(output, "NAME") || !strings.Contains(output, "DESCRIPTION") {
 		t.Fatalf("stdout missing table headers: %s", output)
 	}
-	if !strings.Contains(output, "guest") || !strings.Contains(output, "10") || !strings.Contains(output, "yes") {
+	if !strings.Contains(output, "guest") || !strings.Contains(output, "10") {
 		t.Fatalf("stdout missing VLAN row: %s", output)
 	}
 }
@@ -315,7 +315,7 @@ func TestVlansListJSONOutput(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"items":[{"id":1,"name":"guest","vlan_id":10,"description":"Guest devices","is_active":true,"created_at":"2026-03-13T00:00:00Z","updated_at":"2026-03-13T00:00:00Z"}]}`))
+		_, _ = w.Write([]byte(`{"items":[{"name":"guest","vlan_id":10,"description":"Guest devices","created_at":"2026-03-13T00:00:00Z","updated_at":"2026-03-13T00:00:00Z"}]}`))
 	}))
 	defer server.Close()
 
@@ -350,7 +350,7 @@ func TestVlansCreatePrintsCreatedMessage(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte(`{"id":42,"name":"iot","vlan_id":20,"description":"IoT devices","is_active":true,"created_at":"2026-03-13T00:00:00Z","updated_at":"2026-03-13T00:00:00Z"}`))
+		_, _ = w.Write([]byte(`{"name":"iot","vlan_id":20,"description":"IoT devices","created_at":"2026-03-13T00:00:00Z","updated_at":"2026-03-13T00:00:00Z"}`))
 	}))
 	defer server.Close()
 
@@ -366,7 +366,6 @@ func TestVlansCreatePrintsCreatedMessage(t *testing.T) {
 		"--name", "iot",
 		"--vlan-id", "20",
 		"--description", "IoT devices",
-		"--active",
 	})
 
 	if err := cmd.Execute(); err != nil {
@@ -378,10 +377,7 @@ func TestVlansCreatePrintsCreatedMessage(t *testing.T) {
 	if request.Description == nil || *request.Description != "IoT devices" {
 		t.Fatalf("description = %+v, want IoT devices", request.Description)
 	}
-	if request.IsActive == nil || !*request.IsActive {
-		t.Fatalf("is_active = %+v, want true", request.IsActive)
-	}
-	if !strings.Contains(stdout.String(), "Created VLAN 42 (iot).") {
+	if !strings.Contains(stdout.String(), "Created VLAN 20 (iot).") {
 		t.Fatalf("stdout missing create confirmation: %s", stdout.String())
 	}
 }
@@ -432,7 +428,7 @@ func TestDevicesCreatePrintsCreatedMessage(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte(`{"id":"00000000-0000-0000-0000-000000000123","display_name":"Kitchen TV","mac_address":"aa:bb:cc:dd:ee:ff","vlan":{"id":1,"name":"trusted","vlan_id":1},"created_at":"2026-03-13T00:00:00Z","updated_at":"2026-03-13T00:00:00Z"}`))
+		_, _ = w.Write([]byte(`{"id":"00000000-0000-0000-0000-000000000123","display_name":"Kitchen TV","mac_address":"aa:bb:cc:dd:ee:ff","vlan":{"name":"trusted","vlan_id":1},"created_at":"2026-03-13T00:00:00Z","updated_at":"2026-03-13T00:00:00Z"}`))
 	}))
 	defer server.Close()
 
@@ -471,7 +467,7 @@ func TestDevicesListPrintsIDAndSupportsJSONOutput(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"items":[{"id":"00000000-0000-0000-0000-000000000123","display_name":"Kitchen TV","mac_address":"aa:bb:cc:dd:ee:ff","vlan":{"id":1,"name":"trusted","vlan_id":1},"created_at":"2026-03-13T00:00:00Z","updated_at":"2026-03-13T00:00:00Z"}]}`))
+		_, _ = w.Write([]byte(`{"items":[{"id":"00000000-0000-0000-0000-000000000123","display_name":"Kitchen TV","mac_address":"aa:bb:cc:dd:ee:ff","vlan":{"name":"trusted","vlan_id":1},"created_at":"2026-03-13T00:00:00Z","updated_at":"2026-03-13T00:00:00Z"}]}`))
 	}))
 	defer server.Close()
 
