@@ -53,13 +53,15 @@ func newLoginCommand(options *RootOptions) *cobra.Command {
 			}
 
 			if !force {
-				if _, _, err := runtime.Sessions.Load(runtime.Profile, session.BackendAuto); err == nil {
+				exists, err := runtime.Sessions.Exists(runtime.Profile)
+				if err != nil {
+					return err
+				}
+				if exists {
 					return fmt.Errorf(
 						"profile %q is already signed in; use --force to replace the existing session or run logout first",
 						runtime.Profile,
 					)
-				} else if !errors.Is(err, session.ErrSessionNotFound) {
-					return err
 				}
 			}
 

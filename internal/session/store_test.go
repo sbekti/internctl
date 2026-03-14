@@ -122,3 +122,21 @@ func TestManagerLoadKeepsExplicitFileBackend(t *testing.T) {
 		t.Fatalf("loaded access token = %q, want %q", loaded.AccessToken, data.AccessToken)
 	}
 }
+
+func TestManagerExistsIgnoresUnavailableKeyringWhenNoSessionExists(t *testing.T) {
+	t.Parallel()
+
+	manager := &Manager{
+		configDir:   t.TempDir(),
+		serviceName: ServiceName,
+		keyring:     &fakeKeyring{getErr: errors.New("keyring unavailable")},
+	}
+
+	exists, err := manager.Exists("default")
+	if err != nil {
+		t.Fatalf("Exists returned error: %v", err)
+	}
+	if exists {
+		t.Fatal("Exists = true, want false")
+	}
+}

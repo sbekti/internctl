@@ -165,6 +165,30 @@ func (m *Manager) Delete(profile string, backend Backend) error {
 	}
 }
 
+func (m *Manager) Exists(profile string) (bool, error) {
+	normalizedProfile, err := config.NormalizeProfileName(profile)
+	if err != nil {
+		return false, err
+	}
+
+	if _, err := m.keyring.Get(m.serviceName, normalizedProfile); err == nil {
+		return true, nil
+	} else if !errors.Is(err, keyring.ErrNotFound) {
+		// Ignore transient keyring availability errors so file-backed workflows
+		// still function on hosts without a running secret-service daemon.
+	}
+
+	if _, err := os.Stat(m.sessionPath(normalizedProfile)); err == nil {
+		return true, nil
+	} else if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	} else {
+		return false, fmt.Errorf("stat session file: %w", err)
+	}
+
+	return false, nil
+}
+
 func (m *Manager) loadFromKeyring(profile string) (Data, error) {
 	secret, err := m.keyring.Get(m.serviceName, profile)
 	if err != nil {
