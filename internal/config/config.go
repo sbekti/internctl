@@ -10,10 +10,9 @@ import (
 	"strings"
 )
 
-const (
-	DefaultProfile   = "default"
-	DefaultServerURL = "https://intern.corp.example.com"
-)
+const DefaultProfile = "default"
+
+var DefaultServerURL = "https://intern.corp.example.com"
 
 var (
 	ErrInvalidProfileName = errors.New("invalid profile name")
