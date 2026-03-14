@@ -413,6 +413,37 @@ func TestVlansDeleteRequiresAdmin(t *testing.T) {
 	}
 }
 
+func TestVlansDeleteShowsReferencedDeviceMessage(t *testing.T) {
+	t.Parallel()
+
+	configDir := t.TempDir()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/networks/vlans/334" || r.Method != http.MethodDelete {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"code":"conflict","message":"this VLAN is still assigned to one or more devices; reassign or delete those devices before deleting the VLAN"}`))
+	}))
+	defer server.Close()
+
+	writeLoggedInProfile(t, configDir, server.URL)
+
+	cmd := NewRootCommand()
+	cmd.SetOut(new(bytes.Buffer))
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetArgs([]string{"vlan", "delete", "334", "--config-dir", configDir})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "still assigned to one or more devices") {
+		t.Fatalf("error = %q, want referenced-device message", err.Error())
+	}
+}
+
 func TestDevicesCreatePrintsCreatedMessage(t *testing.T) {
 	t.Parallel()
 

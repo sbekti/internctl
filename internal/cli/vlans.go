@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -237,6 +238,10 @@ func mapVlanMutationError(err error, action string) error {
 	}
 	if errors.Is(err, httpclient.ErrForbidden) {
 		return fmt.Errorf("admin access is required to %s VLANs", action)
+	}
+	var apiErr httpclient.APIError
+	if errors.As(err, &apiErr) && strings.TrimSpace(apiErr.Message) != "" {
+		return errors.New(apiErr.Message)
 	}
 	return err
 }
