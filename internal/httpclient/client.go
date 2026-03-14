@@ -171,7 +171,7 @@ func (c *Client) GetProfile(ctx context.Context) (*api.Profile, error) {
 
 	switch resp.StatusCode() {
 	case http.StatusOK:
-		return resp.JSON200, nil
+		return requireDecodedBody("get profile", resp.StatusCode(), resp.Body, resp.JSON200)
 	case http.StatusUnauthorized:
 		return nil, ErrUnauthorized
 	default:
@@ -187,7 +187,11 @@ func (c *Client) ListVlans(ctx context.Context) ([]api.Vlan, error) {
 
 	switch resp.StatusCode() {
 	case http.StatusOK:
-		return resp.JSON200.Items, nil
+		body, err := requireDecodedBody("list vlans", resp.StatusCode(), resp.Body, resp.JSON200)
+		if err != nil {
+			return nil, err
+		}
+		return body.Items, nil
 	case http.StatusUnauthorized:
 		return nil, ErrUnauthorized
 	case http.StatusForbidden:
@@ -205,7 +209,11 @@ func (c *Client) ListNetworkDevices(ctx context.Context) ([]api.NetworkDevice, e
 
 	switch resp.StatusCode() {
 	case http.StatusOK:
-		return resp.JSON200.Items, nil
+		body, err := requireDecodedBody("list network devices", resp.StatusCode(), resp.Body, resp.JSON200)
+		if err != nil {
+			return nil, err
+		}
+		return body.Items, nil
 	case http.StatusUnauthorized:
 		return nil, ErrUnauthorized
 	case http.StatusForbidden:
@@ -223,7 +231,7 @@ func (c *Client) CreateVlan(ctx context.Context, body api.VlanWrite) (*api.Vlan,
 
 	switch resp.StatusCode() {
 	case http.StatusCreated:
-		return resp.JSON201, nil
+		return requireDecodedBody("create vlan", resp.StatusCode(), resp.Body, resp.JSON201)
 	case http.StatusUnauthorized:
 		return nil, ErrUnauthorized
 	case http.StatusForbidden:
@@ -245,7 +253,7 @@ func (c *Client) UpdateVlan(ctx context.Context, vlanID int32, body api.VlanPatc
 
 	switch resp.StatusCode() {
 	case http.StatusOK:
-		return resp.JSON200, nil
+		return requireDecodedBody("update vlan", resp.StatusCode(), resp.Body, resp.JSON200)
 	case http.StatusUnauthorized:
 		return nil, ErrUnauthorized
 	case http.StatusForbidden:
@@ -294,7 +302,7 @@ func (c *Client) CreateNetworkDevice(ctx context.Context, body api.NetworkDevice
 
 	switch resp.StatusCode() {
 	case http.StatusCreated:
-		return resp.JSON201, nil
+		return requireDecodedBody("create network device", resp.StatusCode(), resp.Body, resp.JSON201)
 	case http.StatusUnauthorized:
 		return nil, ErrUnauthorized
 	case http.StatusForbidden:
@@ -321,7 +329,7 @@ func (c *Client) UpdateNetworkDevice(ctx context.Context, id string, body api.Ne
 
 	switch resp.StatusCode() {
 	case http.StatusOK:
-		return resp.JSON200, nil
+		return requireDecodedBody("update network device", resp.StatusCode(), resp.Body, resp.JSON200)
 	case http.StatusUnauthorized:
 		return nil, ErrUnauthorized
 	case http.StatusForbidden:
@@ -378,7 +386,7 @@ func (c *Client) ListSessions(ctx context.Context, all bool, limit, offset int32
 
 		switch resp.StatusCode() {
 		case http.StatusOK:
-			return resp.JSON200, nil
+			return requireDecodedBody("list admin sessions", resp.StatusCode(), resp.Body, resp.JSON200)
 		case http.StatusUnauthorized:
 			return nil, ErrUnauthorized
 		case http.StatusForbidden:
@@ -399,7 +407,7 @@ func (c *Client) ListSessions(ctx context.Context, all bool, limit, offset int32
 
 	switch resp.StatusCode() {
 	case http.StatusOK:
-		return resp.JSON200, nil
+		return requireDecodedBody("list sessions", resp.StatusCode(), resp.Body, resp.JSON200)
 	case http.StatusUnauthorized:
 		return nil, ErrUnauthorized
 	default:
@@ -641,4 +649,28 @@ func unexpectedStatus(action string, statusCode int, body []byte) error {
 		return fmt.Errorf("%s: unexpected status %d", action, statusCode)
 	}
 	return fmt.Errorf("%s: unexpected status %d: %s", action, statusCode, strings.TrimSpace(string(body)))
+}
+
+func requireDecodedBody[T any](action string, statusCode int, body []byte, decoded *T) (*T, error) {
+	if decoded != nil {
+		return decoded, nil
+	}
+
+	snippet := strings.TrimSpace(string(body))
+	if snippet == "" {
+		return nil, fmt.Errorf("%s: status %d returned an empty response body", action, statusCode)
+	}
+
+	if len(snippet) > 240 {
+		snippet = snippet[:240] + "..."
+	}
+
+	if strings.HasPrefix(snippet, "<") {
+		return nil, fmt.Errorf(
+			"%s: received a non-API response from the server; check the configured server URL and ingress auth routing",
+			action,
+		)
+	}
+
+	return nil, fmt.Errorf("%s: failed to decode response body for status %d: %s", action, statusCode, snippet)
 }

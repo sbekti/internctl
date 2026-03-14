@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -165,6 +166,84 @@ func TestClientGetProfileDoesNotRefreshOnNon401(t *testing.T) {
 	}
 	if got := atomic.LoadInt32(&refreshCalls); got != 0 {
 		t.Fatalf("refresh call count = %d, want 0", got)
+	}
+}
+
+func TestClientGetProfileReturnsErrorForNonAPISuccessBody(t *testing.T) {
+	t.Parallel()
+
+	manager := session.NewManager(t.TempDir())
+	if _, err := manager.Save("default", session.BackendFile, session.Data{
+		AccessToken:  "access-token",
+		RefreshToken: "refresh-token",
+		TokenType:    "Bearer",
+		ExpiresAt:    time.Now().Add(time.Minute),
+	}); err != nil {
+		t.Fatalf("Save returned error: %v", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/profile":
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<html><body>login</body></html>`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	client, err := New(server.URL, "default", session.BackendFile, manager)
+	if err != nil {
+		t.Fatalf("New returned error: %v", err)
+	}
+
+	_, err = client.GetProfile(context.Background())
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "non-API response") {
+		t.Fatalf("error = %q, want non-API response hint", err)
+	}
+}
+
+func TestClientListVlansReturnsErrorForNonAPISuccessBody(t *testing.T) {
+	t.Parallel()
+
+	manager := session.NewManager(t.TempDir())
+	if _, err := manager.Save("default", session.BackendFile, session.Data{
+		AccessToken:  "access-token",
+		RefreshToken: "refresh-token",
+		TokenType:    "Bearer",
+		ExpiresAt:    time.Now().Add(time.Minute),
+	}); err != nil {
+		t.Fatalf("Save returned error: %v", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/networks/vlans":
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<html><body>login</body></html>`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	client, err := New(server.URL, "default", session.BackendFile, manager)
+	if err != nil {
+		t.Fatalf("New returned error: %v", err)
+	}
+
+	_, err = client.ListVlans(context.Background())
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "non-API response") {
+		t.Fatalf("error = %q, want non-API response hint", err)
 	}
 }
 
